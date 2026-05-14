@@ -957,23 +957,12 @@ async function doLogout() {
 
 // ── BOOT ──────────────────────────────────────────────────────────────
 async function boot() {
-  // 1. Load config
   const cfg = loadCfg();
   if (!cfg) { showView('setup'); return; }
 
-  // 2. Init client
   initClient(cfg.url, cfg.key);
 
-  // 3. Handle auth callback via URL hash (#access_token)
-  const hash = window.location.hash;
-  if (hash && hash.includes('access_token')) {
-    showView('loading', { msg: 'Signing in...' });
-    // Supabase SDK handles this automatically via onAuthStateChange
-    // Clean URL immediately
-    history.replaceState(null, '', window.location.pathname + window.location.search);
-  }
-
-  // 4. Check for public client token in URL
+  // Public client invoice view (?token=xxx) — no auth needed
   const urlParams = new URLSearchParams(window.location.search);
   const token = urlParams.get('token');
   if (token) {
@@ -982,14 +971,28 @@ async function boot() {
     return;
   }
 
-  // 5. Listen for auth state changes (handles magic link callback)
+  showView('loading', { msg: 'Checking session...' });
+
+  // Let Supabase SDK process the URL hash/code FIRST (magic link callback),
+  // THEN check the session. Never clear the hash before getSession().
+  try {
+    const { data: { session } } = await _sb.auth.getSession();
+    if (session) {
+      USER = session.user;
+      // Safe to clean URL now — tokens already consumed
+      history.replaceState(null, '', window.location.pathname);
+      await loadApp();
+      return;
+    }
+  } catch (err) {
+    console.error('Boot error:', err);
+  }
+
+  // No session — listen in case onAuthStateChange fires (PKCE code exchange)
   _sb.auth.onAuthStateChange(async (event, session) => {
     if (event === 'SIGNED_IN' && session) {
       USER = session.user;
-      // Clean URL hash if present
-      if (window.location.hash) {
-        history.replaceState(null, '', window.location.pathname + window.location.search);
-      }
+      history.replaceState(null, '', window.location.pathname);
       await loadApp();
     } else if (event === 'SIGNED_OUT') {
       USER = null;
@@ -997,23 +1000,7 @@ async function boot() {
     }
   });
 
-  await bootWithClient();
-}
-
-async function bootWithClient() {
-  showView('loading', { msg: 'Checking session...' });
-  try {
-    const { data: { session } } = await _sb.auth.getSession();
-    if (!session) {
-      showView('login');
-      return;
-    }
-    USER = session.user;
-    await loadApp();
-  } catch (err) {
-    console.error('Boot error:', err);
-    showView('login');
-  }
+  showView('login');
 }
 
 async function loadApp() {
