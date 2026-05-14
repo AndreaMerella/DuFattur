@@ -849,7 +849,18 @@ function showView(v, opts = {}) {
 }
 
 // ── SUPABASE CONFIG ───────────────────────────────────────────────────
+// Paste your credentials here once → anyone can open the app, each user
+// gets fully isolated data via Row Level Security.
+// The anon key is SAFE to be public — Supabase designed it that way.
+const HARDCODED = {
+  url: '',   // e.g. 'https://abcxyz.supabase.co'
+  key: ''    // e.g. 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'
+};
+
 function loadCfg() {
+  // 1. Use hardcoded credentials if set (deployed/shared app)
+  if (HARDCODED.url && HARDCODED.key) return HARDCODED;
+  // 2. Fall back to localStorage (local dev / first-run setup)
   const raw = localStorage.getItem('df_cfg');
   if (!raw) return null;
   try { return JSON.parse(raw); } catch { return null; }
