@@ -8,6 +8,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;700;800;900&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
     <script>
         tailwind.config = {
             theme: {
@@ -33,8 +34,10 @@
 
         @keyframes slideIn { from { transform: translateX(115%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
         @keyframes fadeUp  { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes spin    { to { transform: rotate(360deg); } }
         .toast-enter { animation: slideIn 0.35s cubic-bezier(0.34,1.56,0.64,1) forwards; }
         .fade-up     { animation: fadeUp 0.3s ease-out forwards; }
+        .spinner     { animation: spin 0.8s linear infinite; }
         @keyframes pulse-dot { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
         .dot-pulse { animation: pulse-dot 1.2s ease-in-out infinite; }
 
@@ -53,6 +56,7 @@
         }
         .btn-y:hover  { background: #ffd633; transform: translateY(-1px); box-shadow: 0 4px 22px rgba(255,204,0,0.28); }
         .btn-y:active { transform: scale(0.97); }
+        .btn-y:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 
         .btn-o {
             background: transparent; color: #777; border-radius: 11px;
@@ -80,13 +84,20 @@
         .badge-paid     { background: rgba(129,140,248,.1); color: #a5b4fc; }
         .badge-overdue  { background: rgba(239,68,68,.1);   color: #fca5a5; }
 
+        .sql-block {
+            background: #0a0a0a; border: 1px solid #222; border-radius: 12px;
+            padding: 16px; font-family: 'Courier New', monospace; font-size: 0.75rem;
+            color: #aaa; white-space: pre-wrap; overflow-x: auto; max-height: 260px;
+            overflow-y: auto; line-height: 1.6;
+        }
+
         @media (max-width: 768px) { .sl { display: none !important; } aside { width: 66px !important; } }
     </style>
 </head>
 <body class="h-screen flex overflow-hidden">
 
 <!-- ═══════════════════ SIDEBAR ═══════════════════ -->
-<aside id="sidebar" class="w-60 bg-panel border-r border-gray-900 flex flex-col py-6 px-3 z-10" style="background:#0e0e0e;">
+<aside id="sidebar" class="w-60 bg-panel border-r border-gray-900 flex flex-col py-6 px-3 z-10 hidden-view" style="background:#0e0e0e;">
 
     <div class="px-3 mb-8">
         <div class="font-black text-[1.4rem] tracking-tighter">DU<span class="text-accent">FATTUR</span></div>
@@ -94,10 +105,10 @@
     </div>
 
     <nav class="flex flex-col gap-1 flex-1">
-        <button onclick="switchView('dashboard')"  id="nav-dashboard"  class="nav-btn active"><span class="ico">⚡</span><span class="sl" data-i18n="nav_dash">Dashboard</span></button>
-        <button onclick="switchView('invoice')"    id="nav-invoice"    class="nav-btn"><span class="ico">📋</span><span class="sl" data-i18n="nav_inv">Nuovo Proforma</span></button>
-        <button onclick="switchView('analytics')"  id="nav-analytics"  class="nav-btn"><span class="ico">📊</span><span class="sl" data-i18n="nav_an">Analisi</span></button>
-        <button onclick="switchView('settings')"   id="nav-settings"   class="nav-btn"><span class="ico">⚙️</span><span class="sl" data-i18n="nav_set">Impostazioni</span></button>
+        <button onclick="showView('dashboard')"  id="nav-dashboard"  class="nav-btn active"><span class="ico">⚡</span><span class="sl" data-i18n="nav_dash">Dashboard</span></button>
+        <button onclick="showView('invoice')"    id="nav-invoice"    class="nav-btn"><span class="ico">📋</span><span class="sl" data-i18n="nav_inv">Nuovo Proforma</span></button>
+        <button onclick="showView('analytics')"  id="nav-analytics"  class="nav-btn"><span class="ico">📊</span><span class="sl" data-i18n="nav_an">Analisi</span></button>
+        <button onclick="showView('settings')"   id="nav-settings"   class="nav-btn"><span class="ico">⚙️</span><span class="sl" data-i18n="nav_set">Impostazioni</span></button>
     </nav>
 
     <!-- Lang toggle -->
@@ -107,7 +118,7 @@
             <button onclick="setLang('en')" id="lang-en" class="flex-1 py-2 rounded-lg text-xs font-black transition text-gray-600 hover:text-white">🇬🇧 EN</button>
         </div>
     </div>
-    <div class="px-3 mt-3 text-[10px] text-gray-700 font-bold">v2.0 · DuFattur</div>
+    <div class="px-3 mt-3 text-[10px] text-gray-700 font-bold">v3.0 · DuFattur</div>
 </aside>
 
 <!-- ═══════════════════ MAIN ═══════════════════ -->
@@ -119,15 +130,153 @@
         <span id="toast-msg">Done!</span>
     </div>
 
+    <!-- ══════════ SETUP ══════════ -->
+    <div id="view-setup" class="hidden-view min-h-screen flex items-center justify-center p-6">
+        <div class="w-full max-w-lg">
+            <div class="text-center mb-10">
+                <div class="font-black text-[2rem] tracking-tighter mb-2">DU<span class="text-accent">FATTUR</span></div>
+                <div class="text-gray-500 text-sm">Connect your Supabase project to get started.</div>
+            </div>
+
+            <div class="card neon mb-5" style="background:#0e0e0e;border-color:#222;">
+                <h2 class="font-black text-white mb-6 text-base">Setup — 3 steps</h2>
+
+                <!-- Step 1 -->
+                <div class="flex gap-4 mb-5">
+                    <div class="w-7 h-7 rounded-full bg-accent text-black font-black text-xs flex items-center justify-center flex-shrink-0">1</div>
+                    <div>
+                        <div class="font-bold text-sm text-white mb-0.5">Create a free project</div>
+                        <a href="https://supabase.com" target="_blank" class="text-accent text-xs font-bold hover:underline">supabase.com →</a>
+                    </div>
+                </div>
+
+                <!-- Step 2 -->
+                <div class="flex gap-4 mb-5">
+                    <div class="w-7 h-7 rounded-full bg-accent text-black font-black text-xs flex items-center justify-center flex-shrink-0">2</div>
+                    <div>
+                        <div class="font-bold text-sm text-white mb-0.5">Copy your Project URL &amp; anon key</div>
+                        <div class="text-gray-600 text-xs">Settings → API → Project URL and anon public key</div>
+                    </div>
+                </div>
+
+                <!-- Step 3 -->
+                <div class="flex gap-4 mb-6">
+                    <div class="w-7 h-7 rounded-full bg-accent text-black font-black text-xs flex items-center justify-center flex-shrink-0">3</div>
+                    <div class="flex-1 min-w-0">
+                        <div class="font-bold text-sm text-white mb-2">Run this SQL in the SQL Editor</div>
+                        <div class="relative">
+                            <pre id="schema-pre" class="sql-block">create table if not exists public.invoices (
+  id            text          primary key,
+  public_token  uuid          not null default gen_random_uuid(),
+  user_id       uuid          not null references auth.users(id) on delete cascade,
+  client        text          not null,
+  client_email  text,
+  issue_date    date,
+  due_date      date,
+  notes         text,
+  items         jsonb         not null default '[]',
+  total         numeric(12,2) not null default 0,
+  status        text          not null default 'pending' check (status in ('pending','approved','paid')),
+  created_at    timestamptz   not null default now()
+);
+
+create table if not exists public.settings (
+  user_id       uuid          primary key references auth.users(id) on delete cascade,
+  name          text,
+  email         text,
+  vat           text,
+  address       text,
+  default_rate  numeric(10,2) default 50,
+  tax_rate      numeric(5,2)  default 15,
+  currency      text          default 'EUR',
+  terms         text,
+  due_days      integer       default 30,
+  lang          text          default 'it',
+  updated_at    timestamptz   default now()
+);
+
+alter table public.invoices enable row level security;
+alter table public.settings  enable row level security;
+
+create policy "owner_invoices" on public.invoices for all to authenticated
+  using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+create policy "anon_read" on public.invoices for select to anon using (true);
+
+create policy "anon_approve" on public.invoices for update to anon
+  using (status = 'pending') with check (status = 'approved');
+
+create policy "owner_settings" on public.settings for all to authenticated
+  using (auth.uid() = user_id) with check (auth.uid() = user_id);</pre>
+                            <button onclick="copySql()" class="absolute top-2 right-2 bg-accent text-black text-[10px] font-black px-3 py-1.5 rounded-lg transition hover:bg-yellow-300">COPY</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Form -->
+                <div class="border-t border-gray-800 pt-6">
+                    <div class="mb-4">
+                        <label class="block text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-2">Project URL</label>
+                        <input type="url" id="setup-url" class="ifield" placeholder="https://xxxxxxxxxxxx.supabase.co">
+                    </div>
+                    <div class="mb-6">
+                        <label class="block text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-2">Anon Public Key</label>
+                        <input type="text" id="setup-key" class="ifield" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...">
+                    </div>
+                    <button id="btn-connect" onclick="doConnect()" class="btn-y w-full">CONNECT &amp; TEST</button>
+                    <div id="setup-err" class="hidden mt-3 text-red-400 text-xs text-center font-bold"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══════════ LOGIN ══════════ -->
+    <div id="view-login" class="hidden-view min-h-screen flex items-center justify-center p-6">
+        <div class="w-full max-w-sm">
+            <div class="text-center mb-10">
+                <div class="font-black text-[2rem] tracking-tighter mb-2">DU<span class="text-accent">FATTUR</span></div>
+                <div class="text-gray-500 text-sm">Sign in with your email — no password needed.</div>
+            </div>
+
+            <div class="card neon" style="background:#0e0e0e;border-color:#222;">
+                <div id="login-form-wrap">
+                    <div class="mb-5">
+                        <label class="block text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-2">Email</label>
+                        <input type="email" id="login-email" class="ifield" placeholder="you@email.com" onkeydown="if(event.key==='Enter')doLogin()">
+                    </div>
+                    <button id="btn-login" onclick="doLogin()" class="btn-y w-full">SEND MAGIC LINK</button>
+                    <div id="login-err" class="hidden mt-3 text-red-400 text-xs text-center font-bold"></div>
+                </div>
+                <div id="login-sent" class="hidden text-center py-4">
+                    <div class="text-4xl mb-4">📬</div>
+                    <div class="font-black text-white mb-2">Check your email!</div>
+                    <div class="text-gray-500 text-sm">We sent a magic link to <span id="sent-email" class="text-accent font-bold"></span></div>
+                </div>
+            </div>
+
+            <div class="text-center mt-6">
+                <button onclick="resetConfig()" class="text-gray-700 hover:text-gray-500 text-xs font-bold transition">Reset Supabase config</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══════════ LOADING ══════════ -->
+    <div id="view-loading" class="hidden-view min-h-screen flex items-center justify-center">
+        <div class="text-center">
+            <div class="w-10 h-10 border-2 border-gray-700 border-t-accent rounded-full spinner mx-auto mb-4"></div>
+            <div class="text-gray-600 text-sm font-bold" id="loading-msg">Loading...</div>
+        </div>
+    </div>
+
     <!-- ══════════ DASHBOARD ══════════ -->
-    <div id="view-dashboard" class="p-6 md:p-10 max-w-5xl mx-auto">
+    <div id="view-dashboard" class="hidden-view p-6 md:p-10 max-w-5xl mx-auto">
 
         <header class="mb-8 flex items-start justify-between gap-4">
             <div>
                 <h1 class="text-3xl font-black" data-i18n="dash_h1">Dashboard Operativa</h1>
                 <p class="text-gray-500 mt-1 text-sm" data-i18n="dash_sub">Monitora ore, incassi e stato dei proforma.</p>
             </div>
-            <button onclick="switchView('invoice')" class="btn-y hidden md:flex items-center gap-2 flex-shrink-0">
+            <button onclick="showView('invoice')" class="btn-y hidden md:flex items-center gap-2 flex-shrink-0">
                 <span>＋</span><span data-i18n="btn_new">Nuovo Proforma</span>
             </button>
         </header>
@@ -196,7 +345,7 @@
         <!-- Invoice list -->
         <div class="flex items-center justify-between mb-4">
             <h2 class="text-lg font-black" data-i18n="list_h">Storico Proforma</h2>
-            <select id="filter-sel" onchange="renderDashboard()" class="ifield text-xs py-2 px-3" style="width:auto;">
+            <select id="filter-sel" onchange="renderDash()" class="ifield text-xs py-2 px-3" style="width:auto;">
                 <option value="all"      data-i18n="f_all">Tutti</option>
                 <option value="pending"  data-i18n="f_pend">In attesa</option>
                 <option value="approved" data-i18n="f_appr">Approvati</option>
@@ -270,8 +419,8 @@
                 </div>
 
                 <div class="flex gap-3">
-                    <button type="submit" class="btn-y flex-1" data-i18n="btn_gen">GENERA LINK</button>
-                    <button type="button" onclick="switchView('dashboard')" class="btn-o" data-i18n="btn_cancel">Annulla</button>
+                    <button type="submit" id="btn-gen-inv" class="btn-y flex-1" data-i18n="btn_gen">GENERA LINK</button>
+                    <button type="button" onclick="showView('dashboard')" class="btn-o" data-i18n="btn_cancel">Annulla</button>
                 </div>
             </form>
 
@@ -281,9 +430,9 @@
                 <h3 class="text-2xl font-black mb-2" data-i18n="succ_h">Link Pronto!</h3>
                 <p class="text-gray-500 text-sm mb-6" data-i18n="succ_p">Invia questo link al cliente per l'approvazione.</p>
 
-                <div id="gen-link" onclick="openClientView(window._lid)" class="w-full bg-black border border-gray-800 rounded-xl px-5 py-4 font-mono text-sm text-accent text-left mb-6 cursor-pointer hover:border-accent transition">
+                <div id="gen-link" onclick="copyClientLink()" class="w-full bg-black border border-gray-800 rounded-xl px-5 py-4 font-mono text-sm text-accent text-left mb-6 cursor-pointer hover:border-accent transition">
                     <div class="text-[10px] text-gray-600 mb-1" data-i18n="lnk_lbl">Link Cliente</div>
-                    <span id="gen-link-txt">dufattur.app/inv/...</span> <span class="text-gray-600">↗</span>
+                    <span id="gen-link-txt">loading...</span> <span class="text-gray-600">↗</span>
                 </div>
 
                 <div class="flex gap-3 w-full">
@@ -337,8 +486,19 @@
                 <button id="btn-approve" class="w-full bg-black text-white py-4 rounded-2xl font-black text-base transition hover:bg-gray-800 active:scale-95">
                     <span data-i18n="cv_approve">APPROVA E CONFERMA</span>
                 </button>
-                <button onclick="switchView('dashboard')" class="w-full text-center mt-4 text-gray-400 font-bold text-sm" data-i18n="cv_back">← Torna all'App</button>
+                <div id="cv-back-wrap" class="hidden">
+                    <button onclick="showView('dashboard')" class="w-full text-center mt-4 text-gray-400 font-bold text-sm" data-i18n="cv_back">← Torna all'App</button>
+                </div>
             </div>
+        </div>
+
+        <div id="cv-loading" class="hidden text-center mt-8">
+            <div class="w-8 h-8 border-2 border-gray-700 border-t-accent rounded-full spinner mx-auto mb-3"></div>
+            <div class="text-gray-600 text-xs font-bold">Loading invoice...</div>
+        </div>
+        <div id="cv-error" class="hidden text-center mt-8">
+            <div class="text-4xl mb-3">❌</div>
+            <div class="text-red-400 font-bold">Invoice not found or link expired.</div>
         </div>
     </div>
 
@@ -443,13 +603,27 @@
                 </div>
             </div>
 
+            <!-- Language inside settings -->
+            <div class="card" style="background:#0e0e0e;border-color:#1e1e1e;">
+                <h3 class="text-[10px] font-black uppercase tracking-widest text-gray-500 mb-4" data-i18n="set_lang">Lingua / Language</h3>
+                <div class="flex bg-black rounded-xl p-1 border border-gray-900 max-w-[180px]">
+                    <button onclick="setLang('it')" id="lang-it" class="flex-1 py-2 rounded-lg text-xs font-black transition bg-accent text-black">🇮🇹 IT</button>
+                    <button onclick="setLang('en')" id="lang-en" class="flex-1 py-2 rounded-lg text-xs font-black transition text-gray-600 hover:text-white">🇬🇧 EN</button>
+                </div>
+            </div>
+
             <div class="card border-red-900" style="background:#0e0e0e;">
                 <h3 class="text-[10px] font-black uppercase tracking-widest text-red-500 mb-2" data-i18n="set_danger">Zona Pericolosa</h3>
-                <p class="text-gray-600 text-xs mb-4" data-i18n="set_danger_p">Elimina tutti i dati salvati. Azione irreversibile.</p>
+                <p class="text-gray-600 text-xs mb-4" data-i18n="set_danger_p">Elimina tutti i proforma dal database. Azione irreversibile.</p>
                 <button onclick="clearData()" class="bg-red-700 hover:bg-red-600 text-white px-5 py-3 rounded-xl font-black text-sm transition" data-i18n="btn_clear">Cancella Tutti i Dati</button>
             </div>
 
-            <button onclick="saveSettings()" class="btn-y w-full" data-i18n="btn_save">SALVA IMPOSTAZIONI</button>
+            <button id="btn-save-settings" onclick="saveSettings()" class="btn-y w-full" data-i18n="btn_save">SALVA IMPOSTAZIONI</button>
+
+            <!-- Logout -->
+            <button onclick="doLogout()" class="btn-o w-full flex items-center justify-center gap-2 text-red-400 border-red-900 hover:border-red-600">
+                <span>🚪</span><span data-i18n="btn_logout">Logout</span>
+            </button>
         </div>
     </div>
 
@@ -458,8 +632,7 @@
 <!-- ═══════════════════ APP LOGIC ═══════════════════ -->
 <script>
 // ─────────────────────────────────────────────────────────────────────
-// DUFATTUR v2.0  |  The Freelance OS
-// Bilingual (IT/EN) · localStorage persistence · PDF export · Analytics
+// DUFATTUR v3.0  |  The Freelance OS — Supabase Edition
 // ─────────────────────────────────────────────────────────────────────
 
 // ── I18N ──────────────────────────────────────────────────────────────
@@ -481,7 +654,7 @@ const L = {
     lbl_notes:'Note / Termini di Pagamento', ph_notes:'Es. Pagamento entro 30 giorni dalla ricezione...',
     btn_gen:'GENERA LINK', btn_cancel:'Annulla', btn_pdf:'Esporta PDF', btn_another:'＋ Nuovo',
     succ_h:'Link Pronto!', succ_p:'Invia questo link al cliente per l\'approvazione.',
-    lnk_lbl:'Link Cliente',
+    lnk_lbl:'Link Cliente (clicca per copiare)',
     col_desc:'Descrizione', col_h:'Ore', col_r:'€/h',
     cv_lbl:'Proforma', cv_from:'Da', cv_to:'A', cv_tot:'Totale da Saldare',
     cv_approve:'APPROVA E CONFERMA', cv_back:'← Torna all\'App',
@@ -498,16 +671,17 @@ const L = {
     set_terms_l:'Note standard (pre-compilate su ogni proforma)',
     ph_terms:'Es. Pagamento dovuto entro 30 giorni dalla data di emissione.',
     set_days:'Giorni scadenza default',
-    set_danger:'Zona Pericolosa', set_danger_p:'Elimina tutti i dati salvati. Azione irreversibile.',
-    btn_clear:'Cancella Tutti i Dati', btn_save:'SALVA IMPOSTAZIONI',
+    set_lang:'Lingua',
+    set_danger:'Zona Pericolosa', set_danger_p:'Elimina tutti i proforma dal database. Azione irreversibile.',
+    btn_clear:'Cancella Tutti i Dati', btn_save:'SALVA IMPOSTAZIONI', btn_logout:'Logout',
     ph_item:'Descrizione servizio',
     s_pending:'In attesa', s_approved:'Approvato', s_paid:'Pagato', s_overdue:'Scaduto',
     act_preview:'Anteprima', act_paid:'Segna Pagato', act_del:'Elimina',
     t_approved:'Proforma approvato!', t_paid:'Segnato come pagato!',
     t_saved:'Impostazioni salvate!', t_del:'Proforma eliminato.', t_cleared:'Dati eliminati.',
-    t_pdf:'PDF esportato!', t_warn:'Aggiungi almeno una voce!',
+    t_pdf:'PDF esportato!', t_warn:'Aggiungi almeno una voce!', t_copied:'Link copiato!',
     empty:'Nessun proforma trovato. Crea il primo!',
-    c_del:'Eliminare questo proforma?', c_clear:'Sei SICURO? Verranno eliminati TUTTI i dati.',
+    c_del:'Eliminare questo proforma?', c_clear:'Sei SICURO? Verranno eliminati TUTTI i proforma.',
     due_lbl:'Scade il', issue_lbl:'Emesso il',
     no_clients:'Nessun dato disponibile.',
     pdf_type:'PROFORMA', pdf_from:'DA', pdf_to:'A',
@@ -531,7 +705,7 @@ const L = {
     lbl_notes:'Notes / Payment Terms', ph_notes:'e.g. Payment due within 30 days of receipt...',
     btn_gen:'GENERATE LINK', btn_cancel:'Cancel', btn_pdf:'Export PDF', btn_another:'＋ New Invoice',
     succ_h:'Link Ready!', succ_p:'Send this link to your client for approval.',
-    lnk_lbl:'Client Link',
+    lnk_lbl:'Client Link (click to copy)',
     col_desc:'Description', col_h:'Hours', col_r:'Rate',
     cv_lbl:'Invoice', cv_from:'From', cv_to:'To', cv_tot:'Total Due',
     cv_approve:'APPROVE & CONFIRM', cv_back:'← Back to App',
@@ -548,16 +722,17 @@ const L = {
     set_terms_l:'Standard notes (pre-filled on every invoice)',
     ph_terms:'e.g. Payment is due within 30 days of the invoice date.',
     set_days:'Default due days',
-    set_danger:'Danger Zone', set_danger_p:'Deletes all saved data. This cannot be undone.',
-    btn_clear:'Clear All Data', btn_save:'SAVE SETTINGS',
+    set_lang:'Language',
+    set_danger:'Danger Zone', set_danger_p:'Deletes all invoices from the database. This cannot be undone.',
+    btn_clear:'Clear All Data', btn_save:'SAVE SETTINGS', btn_logout:'Logout',
     ph_item:'Service description',
     s_pending:'Pending', s_approved:'Approved', s_paid:'Paid', s_overdue:'Overdue',
     act_preview:'Preview', act_paid:'Mark Paid', act_del:'Delete',
     t_approved:'Invoice approved!', t_paid:'Marked as paid!',
     t_saved:'Settings saved!', t_del:'Invoice deleted.', t_cleared:'All data cleared.',
-    t_pdf:'PDF exported!', t_warn:'Add at least one line item!',
+    t_pdf:'PDF exported!', t_warn:'Add at least one line item!', t_copied:'Link copied!',
     empty:'No invoices found. Create your first one!',
-    c_del:'Delete this invoice?', c_clear:'Are you SURE? This will delete ALL data.',
+    c_del:'Delete this invoice?', c_clear:'Are you SURE? This will delete ALL invoices.',
     due_lbl:'Due', issue_lbl:'Issued',
     no_clients:'No data available.',
     pdf_type:'INVOICE', pdf_from:'FROM', pdf_to:'TO',
@@ -567,6 +742,8 @@ const L = {
 };
 
 // ── STATE ─────────────────────────────────────────────────────────────
+let _sb  = null;   // Supabase client
+let USER = null;   // auth user object
 let S = {
   lang: 'it',
   invoices: [],
@@ -579,85 +756,328 @@ let S = {
 let revChart = null;
 let itemIdx  = 0;
 
-// ── PERSIST ────────────────────────────────────────────────────────────
-function save() {
-  localStorage.setItem('df2', JSON.stringify({ lang: S.lang, invoices: S.invoices, settings: S.settings }));
-}
-function load() {
-  const d = localStorage.getItem('df2');
-  if (d) {
-    const p = JSON.parse(d);
-    S.lang     = p.lang || 'it';
-    S.invoices = p.invoices || [];
-    S.settings = { ...S.settings, ...(p.settings || {}) };
-  }
-}
+// ── HELPERS ───────────────────────────────────────────────────────────
+function t(k) { return L[S.lang][k] || L.it[k] || k; }
+function sym() { return { EUR:'€', USD:'$', GBP:'£', CHF:'Fr.', DKK:'kr', SEK:'kr', NOK:'kr' }[S.settings.currency] || '€'; }
+function fmt(n) { return `${sym()} ${parseFloat(n||0).toFixed(2)}`; }
 
-// ── CURRENCY ───────────────────────────────────────────────────────────
-function sym() {
-  return { EUR:'€', USD:'$', GBP:'£', CHF:'Fr.', DKK:'kr', SEK:'kr', NOK:'kr' }[S.settings.currency] || '€';
-}
-function fmt(n) { return `${sym()} ${parseFloat(n).toFixed(2)}`; }
-
-// ── INVOICE ID ─────────────────────────────────────────────────────────
 function newId() {
   const yr  = new Date().getFullYear();
-  const cnt = S.invoices.filter(i => i.id.includes(String(yr))).length + 1;
+  const cnt = S.invoices.filter(i => i.id && i.id.includes(String(yr))).length + 1;
   return `INV-${yr}-${String(cnt).padStart(3,'0')}`;
 }
 
-// ── I18N ───────────────────────────────────────────────────────────────
-function t(k) { return L[S.lang][k] || L.it[k] || k; }
+// ── TOAST ─────────────────────────────────────────────────────────────
+function toast(ico, msg) {
+  const el = document.getElementById('toast');
+  document.getElementById('toast-ico').textContent = ico;
+  document.getElementById('toast-msg').textContent = msg;
+  el.classList.remove('hidden','toast-enter');
+  void el.offsetWidth;
+  el.classList.add('toast-enter');
+  el.classList.remove('hidden');
+  clearTimeout(window._tt);
+  window._tt = setTimeout(() => el.classList.add('hidden'), 3500);
+}
 
+// ── I18N ──────────────────────────────────────────────────────────────
 function applyTr() {
-  document.querySelectorAll('[data-i18n]').forEach(el => el.textContent = t(el.dataset.i18n));
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    if (el.tagName === 'BUTTON' || el.tagName === 'SPAN' || el.tagName === 'DIV' || el.tagName === 'P' || el.tagName === 'H1' || el.tagName === 'H2' || el.tagName === 'H3' || el.tagName === 'LABEL') {
+      el.textContent = t(el.dataset.i18n);
+    }
+  });
   document.querySelectorAll('[data-phi]').forEach(el => el.placeholder = t(el.dataset.phi));
   document.getElementById('html-root').lang = S.lang;
   const btn = document.getElementById('btn-timer');
   if (btn) btn.textContent = S.timer.on ? t('timer_stop') : t('timer_start');
-  // Update select options
   ['f_all','f_pend','f_appr','f_paid','f_over'].forEach((k,i) => {
     const opt = document.querySelectorAll('#filter-sel option')[i];
     if (opt) opt.textContent = t(k);
+  });
+  const cls_a = 'flex-1 py-2 rounded-lg text-xs font-black transition bg-accent text-black';
+  const cls_i = 'flex-1 py-2 rounded-lg text-xs font-black transition text-gray-600 hover:text-white';
+  ['lang-it','lang-en'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.className = (id === 'lang-'+S.lang) ? cls_a : cls_i;
   });
 }
 
 function setLang(l) {
   S.lang = l;
-  save();
-  const cls_a = 'flex-1 py-2 rounded-lg text-xs font-black transition bg-accent text-black';
-  const cls_i = 'flex-1 py-2 rounded-lg text-xs font-black transition text-gray-600 hover:text-white';
-  document.getElementById('lang-it').className = l === 'it' ? cls_a : cls_i;
-  document.getElementById('lang-en').className = l === 'en' ? cls_a : cls_i;
+  // persist to settings table if logged in
+  if (_sb && USER) {
+    _sb.from('settings').upsert({ lang: l, user_id: USER.id, updated_at: new Date().toISOString() })
+      .then(() => {});
+  }
   applyTr();
   const v = document.querySelector('[id^="view-"]:not(.hidden-view)');
   if (v?.id === 'view-dashboard') renderDash();
   if (v?.id === 'view-analytics') renderAnalytics();
 }
 
-// ── NAVIGATION ─────────────────────────────────────────────────────────
-function switchView(v) {
-  ['dashboard','invoice','client','analytics','settings'].forEach(n =>
-    document.getElementById('view-'+n).classList.add('hidden-view'));
+// ── VIEW MANAGEMENT ───────────────────────────────────────────────────
+const ALL_VIEWS = ['setup','login','loading','dashboard','invoice','client','analytics','settings'];
+const SIDEBAR_VIEWS = ['dashboard','invoice','analytics','settings'];
 
-  if (v === 'client') {
-    document.getElementById('sidebar').style.display = 'none';
-  } else {
-    document.getElementById('sidebar').style.display = 'flex';
-    ['dashboard','invoice','analytics','settings'].forEach(n => {
+function showView(v, opts = {}) {
+  ALL_VIEWS.forEach(n => {
+    const el = document.getElementById('view-'+n);
+    if (el) el.classList.add('hidden-view');
+  });
+  const sidebar = document.getElementById('sidebar');
+  if (SIDEBAR_VIEWS.includes(v)) {
+    sidebar.classList.remove('hidden-view');
+    SIDEBAR_VIEWS.forEach(n => {
       const el = document.getElementById('nav-'+n);
       if (el) el.className = 'nav-btn' + (n === v ? ' active' : '');
     });
+  } else {
+    sidebar.classList.add('hidden-view');
   }
-  document.getElementById('view-'+v).classList.remove('hidden-view');
+  const target = document.getElementById('view-'+v);
+  if (target) target.classList.remove('hidden-view');
+
+  if (v === 'loading' && opts.msg) {
+    document.getElementById('loading-msg').textContent = opts.msg;
+  }
   if (v === 'dashboard') renderDash();
   if (v === 'analytics') renderAnalytics();
   if (v === 'settings')  loadSetForm();
   if (v === 'invoice')   initInvForm();
-  window.scrollTo(0,0);
+  window.scrollTo(0, 0);
 }
 
-// ── TIMER ──────────────────────────────────────────────────────────────
+// ── SUPABASE CONFIG ───────────────────────────────────────────────────
+function loadCfg() {
+  const raw = localStorage.getItem('df_cfg');
+  if (!raw) return null;
+  try { return JSON.parse(raw); } catch { return null; }
+}
+
+function saveCfg(url, key) {
+  localStorage.setItem('df_cfg', JSON.stringify({ url, key }));
+}
+
+function resetConfig() {
+  localStorage.removeItem('df_cfg');
+  location.reload();
+}
+
+function initClient(url, key) {
+  _sb = supabase.createClient(url, key);
+}
+
+// ── SETUP VIEW ────────────────────────────────────────────────────────
+function copySql() {
+  const text = document.getElementById('schema-pre').textContent;
+  navigator.clipboard.writeText(text).then(() => toast('📋', 'SQL copied!'));
+}
+
+async function doConnect() {
+  const url = document.getElementById('setup-url').value.trim();
+  const key = document.getElementById('setup-key').value.trim();
+  const errEl = document.getElementById('setup-err');
+  const btn   = document.getElementById('btn-connect');
+
+  errEl.classList.add('hidden');
+  if (!url || !key) { errEl.textContent = 'Please fill in both fields.'; errEl.classList.remove('hidden'); return; }
+  if (!url.startsWith('https://')) { errEl.textContent = 'Project URL must start with https://'; errEl.classList.remove('hidden'); return; }
+
+  btn.disabled = true;
+  btn.textContent = 'Testing connection...';
+
+  try {
+    initClient(url, key);
+    // Test connection with a lightweight call
+    const { error } = await _sb.from('settings').select('user_id').limit(1);
+    if (error && error.code !== 'PGRST116' && error.message && error.message.includes('relation') ) {
+      throw new Error('Tables not found. Did you run the SQL schema?');
+    }
+    saveCfg(url, key);
+    toast('✅', 'Connected!');
+    showView('loading', { msg: 'Initializing...' });
+    await bootWithClient();
+  } catch (err) {
+    errEl.textContent = err.message || 'Connection failed. Check your URL and key.';
+    errEl.classList.remove('hidden');
+    btn.disabled = false;
+    btn.textContent = 'CONNECT & TEST';
+  }
+}
+
+// ── LOGIN VIEW ────────────────────────────────────────────────────────
+async function doLogin() {
+  const email = document.getElementById('login-email').value.trim();
+  const errEl = document.getElementById('login-err');
+  const btn   = document.getElementById('btn-login');
+  errEl.classList.add('hidden');
+  if (!email) { errEl.textContent = 'Please enter your email.'; errEl.classList.remove('hidden'); return; }
+
+  btn.disabled = true;
+  btn.textContent = 'Sending...';
+
+  try {
+    const redirectTo = window.location.origin + window.location.pathname;
+    const { error } = await _sb.auth.signInWithOtp({
+      email,
+      options: { emailRedirectTo: redirectTo }
+    });
+    if (error) throw error;
+    document.getElementById('sent-email').textContent = email;
+    document.getElementById('login-form-wrap').classList.add('hidden');
+    document.getElementById('login-sent').classList.remove('hidden');
+  } catch (err) {
+    errEl.textContent = err.message || 'Failed to send magic link.';
+    errEl.classList.remove('hidden');
+    btn.disabled = false;
+    btn.textContent = 'SEND MAGIC LINK';
+  }
+}
+
+async function doLogout() {
+  showView('loading', { msg: 'Signing out...' });
+  await _sb.auth.signOut();
+  USER = null;
+  S.invoices = [];
+  S.settings = { name:'', email:'', vat:'', address:'', defaultRate:50, taxRate:15, currency:'EUR', terms:'', dueDays:30 };
+  showView('login');
+}
+
+// ── BOOT ──────────────────────────────────────────────────────────────
+async function boot() {
+  // 1. Load config
+  const cfg = loadCfg();
+  if (!cfg) { showView('setup'); return; }
+
+  // 2. Init client
+  initClient(cfg.url, cfg.key);
+
+  // 3. Handle auth callback via URL hash (#access_token)
+  const hash = window.location.hash;
+  if (hash && hash.includes('access_token')) {
+    showView('loading', { msg: 'Signing in...' });
+    // Supabase SDK handles this automatically via onAuthStateChange
+    // Clean URL immediately
+    history.replaceState(null, '', window.location.pathname + window.location.search);
+  }
+
+  // 4. Check for public client token in URL
+  const urlParams = new URLSearchParams(window.location.search);
+  const token = urlParams.get('token');
+  if (token) {
+    showView('client');
+    await loadClientView(token);
+    return;
+  }
+
+  // 5. Listen for auth state changes (handles magic link callback)
+  _sb.auth.onAuthStateChange(async (event, session) => {
+    if (event === 'SIGNED_IN' && session) {
+      USER = session.user;
+      // Clean URL hash if present
+      if (window.location.hash) {
+        history.replaceState(null, '', window.location.pathname + window.location.search);
+      }
+      await loadApp();
+    } else if (event === 'SIGNED_OUT') {
+      USER = null;
+      showView('login');
+    }
+  });
+
+  await bootWithClient();
+}
+
+async function bootWithClient() {
+  showView('loading', { msg: 'Checking session...' });
+  try {
+    const { data: { session } } = await _sb.auth.getSession();
+    if (!session) {
+      showView('login');
+      return;
+    }
+    USER = session.user;
+    await loadApp();
+  } catch (err) {
+    console.error('Boot error:', err);
+    showView('login');
+  }
+}
+
+async function loadApp() {
+  showView('loading', { msg: 'Loading your data...' });
+  try {
+    const [invRes, setRes] = await Promise.all([
+      _sb.from('invoices').select('*').eq('user_id', USER.id).order('created_at', { ascending: false }),
+      _sb.from('settings').select('*').eq('user_id', USER.id).single()
+    ]);
+
+    if (invRes.error) throw invRes.error;
+
+    // Map DB snake_case to JS camelCase
+    S.invoices = (invRes.data || []).map(dbToInv);
+
+    if (setRes.data) {
+      const d = setRes.data;
+      S.settings = {
+        name:        d.name        || '',
+        email:       d.email       || '',
+        vat:         d.vat         || '',
+        address:     d.address     || '',
+        defaultRate: parseFloat(d.default_rate) || 50,
+        taxRate:     parseFloat(d.tax_rate)      || 15,
+        currency:    d.currency    || 'EUR',
+        terms:       d.terms       || '',
+        dueDays:     parseInt(d.due_days)         || 30,
+      };
+      if (d.lang) S.lang = d.lang;
+    }
+
+    applyTr();
+    showView('dashboard');
+  } catch (err) {
+    console.error('loadApp error:', err);
+    toast('❌', err.message || 'Failed to load data');
+    showView('dashboard');
+  }
+}
+
+// ── DB MAPPING ────────────────────────────────────────────────────────
+function dbToInv(r) {
+  return {
+    id:           r.id,
+    publicToken:  r.public_token,
+    userId:       r.user_id,
+    client:       r.client,
+    clientEmail:  r.client_email || '',
+    issueDate:    r.issue_date   || '',
+    dueDate:      r.due_date     || '',
+    notes:        r.notes        || '',
+    items:        Array.isArray(r.items) ? r.items : (r.items ? JSON.parse(r.items) : []),
+    total:        parseFloat(r.total) || 0,
+    status:       r.status,
+    createdAt:    r.created_at,
+  };
+}
+
+function invToDb(inv) {
+  return {
+    id:           inv.id,
+    user_id:      USER.id,
+    client:       inv.client,
+    client_email: inv.clientEmail || null,
+    issue_date:   inv.issueDate   || null,
+    due_date:     inv.dueDate     || null,
+    notes:        inv.notes       || null,
+    items:        inv.items,
+    total:        parseFloat(inv.total),
+    status:       inv.status,
+    created_at:   inv.createdAt,
+  };
+}
+
+// ── TIMER ─────────────────────────────────────────────────────────────
 function toggleTimer() {
   if (S.timer.on) {
     clearInterval(S.timer.iv);
@@ -665,7 +1085,7 @@ function toggleTimer() {
     S.timer.iv = null;
     document.getElementById('btn-timer').textContent = t('timer_start');
     document.getElementById('btn-timer').className = 'btn-y w-full';
-    document.getElementById('timer-dot').className  = 'w-2 h-2 rounded-full bg-gray-700 transition-colors';
+    document.getElementById('timer-dot').className = 'w-2 h-2 rounded-full bg-gray-700 transition-colors';
   } else {
     const rate = parseFloat(document.getElementById('timer-rate-in').value) || S.settings.defaultRate;
     S.timer.rate = rate;
@@ -675,7 +1095,7 @@ function toggleTimer() {
     document.getElementById('timer-dot').className   = 'w-2 h-2 rounded-full bg-green-400 dot-pulse transition-colors';
     document.getElementById('timer-rate-show').textContent = `@ ${sym()}${rate}/h`;
     S.timer.iv = setInterval(() => {
-      S.timer.earn   += rate / 3600;
+      S.timer.earn    += rate / 3600;
       S.timer.elapsed += 1;
       document.getElementById('live-earn').textContent = fmt(S.timer.earn);
       const h = Math.floor(S.timer.elapsed / 3600);
@@ -687,16 +1107,16 @@ function toggleTimer() {
   }
 }
 
-// ── LINE ITEMS ─────────────────────────────────────────────────────────
+// ── LINE ITEMS ────────────────────────────────────────────────────────
 function addItem(desc='', hours='', rate='') {
   itemIdx++;
   const id = itemIdx;
   const r  = rate || S.settings.defaultRate;
   document.getElementById('items-box').insertAdjacentHTML('beforeend', `
     <div id="row-${id}" class="grid grid-cols-[1fr_80px_80px_28px] gap-2 items-center">
-      <input type="text"   id="d-${id}" value="${desc}"  class="ifield text-sm py-3" placeholder="${t('ph_item')}"  oninput="recalc()" required>
+      <input type="text"   id="d-${id}" value="${desc}"  class="ifield text-sm py-3" placeholder="${t('ph_item')}" oninput="recalc()" required>
       <input type="number" id="h-${id}" value="${hours}" class="ifield text-sm py-3" placeholder="0" min="0.25" step="0.25" oninput="recalc()">
-      <input type="number" id="r-${id}" value="${r}"     class="ifield text-sm py-3" placeholder="50" min="1"   oninput="recalc()">
+      <input type="number" id="r-${id}" value="${r}"     class="ifield text-sm py-3" placeholder="50" min="1" oninput="recalc()">
       <button type="button" onclick="delItem(${id})" class="text-gray-600 hover:text-red-400 transition text-xl leading-none">×</button>
     </div>`);
   recalc();
@@ -721,10 +1141,10 @@ function recalc() {
 function getItems() {
   const items = [];
   document.querySelectorAll('[id^="row-"]').forEach(row => {
-    const n   = row.id.split('-')[1];
-    const d   = document.getElementById(`d-${n}`)?.value||'';
-    const h   = parseFloat(document.getElementById(`h-${n}`)?.value)||0;
-    const r   = parseFloat(document.getElementById(`r-${n}`)?.value)||0;
+    const n = row.id.split('-')[1];
+    const d = document.getElementById(`d-${n}`)?.value || '';
+    const h = parseFloat(document.getElementById(`h-${n}`)?.value) || 0;
+    const r = parseFloat(document.getElementById(`r-${n}`)?.value) || 0;
     if (d || h) items.push({ desc: d, hours: h, rate: r, amount: h * r });
   });
   return items;
@@ -733,17 +1153,21 @@ function getItems() {
 function initInvForm() {
   resetInvForm();
   const today = new Date().toISOString().split('T')[0];
-  const dd    = new Date(); dd.setDate(dd.getDate() + (S.settings.dueDays||30));
-  document.getElementById('in-issue').value  = today;
-  document.getElementById('in-due').value    = dd.toISOString().split('T')[0];
-  document.getElementById('in-notes').value  = S.settings.terms || '';
+  const dd = new Date(); dd.setDate(dd.getDate() + (S.settings.dueDays || 30));
+  document.getElementById('in-issue').value = today;
+  document.getElementById('in-due').value   = dd.toISOString().split('T')[0];
+  document.getElementById('in-notes').value = S.settings.terms || '';
 }
 
-// ── GENERATE INVOICE ───────────────────────────────────────────────────
-function generateInvoice(e) {
+// ── GENERATE INVOICE ──────────────────────────────────────────────────
+async function generateInvoice(e) {
   e.preventDefault();
   const items = getItems();
   if (!items.length) { toast('⚠️', t('t_warn')); return; }
+
+  const btn = document.getElementById('btn-gen-inv');
+  btn.disabled = true;
+  btn.textContent = '...';
 
   const inv = {
     id:          newId(),
@@ -753,20 +1177,40 @@ function generateInvoice(e) {
     dueDate:     document.getElementById('in-due').value,
     notes:       document.getElementById('in-notes').value.trim(),
     items,
-    total:       items.reduce((s,i) => s + i.amount, 0).toFixed(2),
+    total:       items.reduce((s, i) => s + i.amount, 0).toFixed(2),
     status:      'pending',
     createdAt:   new Date().toISOString()
   };
 
-  S.invoices.unshift(inv);
-  save();
-  window._lid = inv.id;
+  try {
+    const { data, error } = await _sb.from('invoices')
+      .insert([invToDb(inv)])
+      .select()
+      .single();
+    if (error) throw error;
 
-  document.getElementById('gen-link-txt').textContent = `dufattur.app/inv/${inv.id}`;
-  document.getElementById('inv-form').classList.add('hidden');
-  const ss = document.getElementById('inv-success');
-  ss.classList.remove('hidden');
-  ss.classList.add('flex','fade-up');
+    const saved = dbToInv(data);
+    S.invoices.unshift(saved);
+    window._lid = saved.id;
+
+    const clientUrl = window.location.origin + window.location.pathname + '?token=' + saved.publicToken;
+    window._clientUrl = clientUrl;
+    document.getElementById('gen-link-txt').textContent = clientUrl;
+
+    document.getElementById('inv-form').classList.add('hidden');
+    const ss = document.getElementById('inv-success');
+    ss.classList.remove('hidden');
+    ss.classList.add('flex', 'fade-up');
+  } catch (err) {
+    toast('❌', err.message || 'Failed to save invoice');
+    btn.disabled = false;
+    btn.textContent = t('btn_gen');
+  }
+}
+
+function copyClientLink() {
+  const url = window._clientUrl || document.getElementById('gen-link-txt').textContent;
+  navigator.clipboard.writeText(url).then(() => toast('📋', t('t_copied')));
 }
 
 function resetInvForm() {
@@ -776,61 +1220,100 @@ function resetInvForm() {
   document.getElementById('inv-form').classList.remove('hidden');
   const ss = document.getElementById('inv-success');
   ss.classList.add('hidden');
-  ss.classList.remove('flex','fade-up');
+  ss.classList.remove('flex', 'fade-up');
+  const btn = document.getElementById('btn-gen-inv');
+  btn.disabled = false;
+  btn.textContent = t('btn_gen');
   addItem();
 }
 
-// ── CLIENT VIEW ────────────────────────────────────────────────────────
-function openClientView(id) {
-  const inv = S.invoices.find(i => i.id === id);
-  if (!inv) return;
+// ── CLIENT VIEW (PUBLIC — no auth) ────────────────────────────────────
+async function loadClientView(token) {
+  const card    = document.querySelector('#view-client > div');
+  const loadEl  = document.getElementById('cv-loading');
+  const errEl   = document.getElementById('cv-error');
 
-  document.getElementById('cv-id').textContent    = inv.id;
-  document.getElementById('cv-from').textContent  = S.settings.name || 'Freelancer';
-  document.getElementById('cv-from-vat').textContent = S.settings.vat ? `${t('pdf_vat')}: ${S.settings.vat}` : '';
-  document.getElementById('cv-to').textContent    = inv.client;
-  document.getElementById('cv-email').textContent = inv.clientEmail || '';
-  document.getElementById('cv-total').textContent = fmt(inv.total);
+  if (card) card.classList.add('hidden');
+  loadEl.classList.remove('hidden');
+  errEl.classList.add('hidden');
 
-  document.getElementById('cv-items').innerHTML = inv.items.map(it => `
-    <div class="flex justify-between items-center py-2.5 border-b border-gray-100 text-sm last:border-0">
-      <div>
-        <div class="font-bold text-gray-800">${it.desc}</div>
-        ${it.hours ? `<div class="text-gray-400 text-xs">${it.hours}h × ${sym()}${it.rate}</div>` : ''}
-      </div>
-      <div class="font-black text-gray-900">${fmt(it.amount)}</div>
-    </div>`).join('');
+  try {
+    const { data, error } = await _sb
+      .from('invoices')
+      .select('*')
+      .eq('public_token', token)
+      .single();
 
-  document.getElementById('cv-issue').textContent = inv.issueDate ? `${t('issue_lbl')}: ${inv.issueDate}` : '';
-  document.getElementById('cv-due').textContent   = inv.dueDate   ? `${t('due_lbl')}: ${inv.dueDate}`    : '';
-  document.getElementById('cv-notes').textContent = inv.notes || '';
+    if (error || !data) throw new Error('Invoice not found');
 
-  const btn = document.getElementById('btn-approve');
-  if (['approved','paid'].includes(inv.status)) {
-    btn.innerHTML  = `✔ ${t('s_'+inv.status).toUpperCase()}`;
-    btn.className  = 'w-full bg-gray-100 text-gray-400 py-4 rounded-2xl font-black text-base cursor-not-allowed';
-    btn.disabled   = true;
-  } else {
-    btn.innerHTML  = `<span data-i18n="cv_approve">${t('cv_approve')}</span>`;
-    btn.className  = 'w-full bg-black text-white py-4 rounded-2xl font-black text-base transition hover:bg-gray-800 active:scale-95';
-    btn.disabled   = false;
-    btn.onclick    = () => approveInv(id);
+    const inv = dbToInv(data);
+
+    // We also need the freelancer's settings — but anon can't read settings.
+    // We'll show what's available on the invoice itself.
+    document.getElementById('cv-id').textContent    = inv.id;
+    document.getElementById('cv-from').textContent  = 'Freelancer'; // name not public
+    document.getElementById('cv-from-vat').textContent = '';
+    document.getElementById('cv-to').textContent    = inv.client;
+    document.getElementById('cv-email').textContent = inv.clientEmail || '';
+    document.getElementById('cv-total').textContent = fmt(inv.total);
+
+    document.getElementById('cv-items').innerHTML = inv.items.map(it => `
+      <div class="flex justify-between items-center py-2.5 border-b border-gray-100 text-sm last:border-0">
+        <div>
+          <div class="font-bold text-gray-800">${it.desc}</div>
+          ${it.hours ? `<div class="text-gray-400 text-xs">${it.hours}h × ${sym()}${it.rate}</div>` : ''}
+        </div>
+        <div class="font-black text-gray-900">${fmt(it.amount)}</div>
+      </div>`).join('');
+
+    document.getElementById('cv-issue').textContent = inv.issueDate ? `Issued: ${inv.issueDate}` : '';
+    document.getElementById('cv-due').textContent   = inv.dueDate   ? `Due: ${inv.dueDate}`      : '';
+    document.getElementById('cv-notes').textContent = inv.notes || '';
+
+    const btn = document.getElementById('btn-approve');
+    const backWrap = document.getElementById('cv-back-wrap');
+    backWrap.classList.add('hidden');
+
+    if (['approved','paid'].includes(inv.status)) {
+      btn.innerHTML = `✔ ${inv.status.toUpperCase()}`;
+      btn.className = 'w-full bg-gray-100 text-gray-400 py-4 rounded-2xl font-black text-base cursor-not-allowed';
+      btn.disabled  = true;
+    } else {
+      btn.innerHTML = `<span>APPROVE &amp; CONFIRM</span>`;
+      btn.className = 'w-full bg-black text-white py-4 rounded-2xl font-black text-base transition hover:bg-gray-800 active:scale-95';
+      btn.disabled  = false;
+      btn.onclick   = () => approveAnon(token, btn);
+    }
+
+    loadEl.classList.add('hidden');
+    if (card) card.classList.remove('hidden');
+
+  } catch (err) {
+    loadEl.classList.add('hidden');
+    errEl.classList.remove('hidden');
   }
-  switchView('client');
 }
 
-function approveInv(id) {
-  const inv = S.invoices.find(i => i.id === id);
-  if (inv) inv.status = 'approved';
-  save();
-  const btn = document.getElementById('btn-approve');
-  btn.innerHTML = `✔ ${t('s_approved').toUpperCase()}`;
-  btn.className = 'w-full bg-green-100 text-green-600 py-4 rounded-2xl font-black text-base cursor-not-allowed';
-  btn.disabled  = true;
-  setTimeout(() => { switchView('dashboard'); toast('✅', t('t_approved')); }, 1400);
+async function approveAnon(token, btn) {
+  btn.disabled = true;
+  btn.textContent = 'Saving...';
+  try {
+    const { error } = await _sb
+      .from('invoices')
+      .update({ status: 'approved' })
+      .eq('public_token', token)
+      .eq('status', 'pending');
+    if (error) throw error;
+    btn.innerHTML = '✔ APPROVED';
+    btn.className = 'w-full bg-green-100 text-green-600 py-4 rounded-2xl font-black text-base cursor-not-allowed';
+  } catch (err) {
+    btn.disabled = false;
+    btn.textContent = 'APPROVE & CONFIRM';
+    toast('❌', err.message || 'Failed to approve');
+  }
 }
 
-// ── DASHBOARD ──────────────────────────────────────────────────────────
+// ── DASHBOARD ─────────────────────────────────────────────────────────
 function getStatus(inv) {
   if (inv.status === 'paid')     return 'paid';
   if (inv.status === 'approved') return 'approved';
@@ -842,22 +1325,21 @@ function renderDash() {
   const total    = S.invoices.length;
   const pending  = S.invoices.filter(i => getStatus(i) === 'pending').length;
   const overdue  = S.invoices.filter(i => getStatus(i) === 'overdue').length;
-  const approved = S.invoices.filter(i => i.status === 'approved').reduce((s,i) => s+parseFloat(i.total), 0);
-  const paid     = S.invoices.filter(i => i.status === 'paid').reduce((s,i)     => s+parseFloat(i.total), 0);
+  const approved = S.invoices.filter(i => i.status === 'approved').reduce((s,i) => s + parseFloat(i.total||0), 0);
+  const paid     = S.invoices.filter(i => i.status === 'paid').reduce((s,i)     => s + parseFloat(i.total||0), 0);
 
-  document.getElementById('kpi-total').textContent   = total;
-  document.getElementById('kpi-pending').textContent = pending;
+  document.getElementById('kpi-total').textContent    = total;
+  document.getElementById('kpi-pending').textContent  = pending;
   document.getElementById('kpi-approved').textContent = fmt(approved);
-  document.getElementById('kpi-tax').textContent     = fmt((approved + paid) * S.settings.taxRate / 100);
-  document.getElementById('kpi-paid').textContent    = fmt(paid);
-  document.getElementById('kpi-overdue').textContent = overdue;
-  document.getElementById('timer-rate-in').value     = S.settings.defaultRate;
+  document.getElementById('kpi-tax').textContent      = fmt((approved + paid) * S.settings.taxRate / 100);
+  document.getElementById('kpi-paid').textContent     = fmt(paid);
+  document.getElementById('kpi-overdue').textContent  = overdue;
+  document.getElementById('timer-rate-in').value      = S.settings.defaultRate;
   document.getElementById('timer-rate-show').textContent = `@ ${sym()}${S.settings.defaultRate}/h`;
 
   const filter = document.getElementById('filter-sel').value;
   const list   = document.getElementById('invoice-list');
-
-  const rows = S.invoices.filter(i => filter === 'all' || getStatus(i) === filter);
+  const rows   = S.invoices.filter(i => filter === 'all' || getStatus(i) === filter);
 
   if (!rows.length) {
     list.innerHTML = `<div class="text-gray-600 text-center py-12 border border-dashed border-gray-800 rounded-2xl text-sm">${t('empty')}</div>`;
@@ -865,18 +1347,20 @@ function renderDash() {
   }
 
   list.innerHTML = rows.map(inv => {
-    const st   = getStatus(inv);
-    const paid = st === 'paid';
-    const clr  = paid ? 'text-indigo-400' : st === 'approved' ? 'text-green-400' : st === 'overdue' ? 'text-red-400' : 'text-accent';
+    const st  = getStatus(inv);
+    const clr = st === 'paid' ? 'text-indigo-400' : st === 'approved' ? 'text-green-400' : st === 'overdue' ? 'text-red-400' : 'text-accent';
+    const clientUrl = inv.publicToken
+      ? window.location.origin + window.location.pathname + '?token=' + inv.publicToken
+      : null;
     return `
-    <div class="inv-row fade-up ${paid ? 'opacity-60' : ''}">
+    <div class="inv-row fade-up ${st === 'paid' ? 'opacity-60' : ''}">
       <div class="flex items-center justify-between gap-4">
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2 mb-1">
             <span class="font-black text-white">${inv.client}</span>
             <span class="text-[10px] text-gray-600 font-mono">${inv.id}</span>
           </div>
-          <div class="text-xs text-gray-500 truncate">${inv.items.map(i=>i.desc).join(', ')}</div>
+          <div class="text-xs text-gray-500 truncate">${inv.items.map(i => i.desc).join(', ')}</div>
           ${inv.dueDate ? `<div class="text-[10px] text-gray-700 mt-1">${t('due_lbl')}: ${inv.dueDate}</div>` : ''}
         </div>
         <div class="text-right flex-shrink-0">
@@ -885,53 +1369,69 @@ function renderDash() {
         </div>
       </div>
       <div class="flex flex-wrap gap-2 mt-4 pt-3 border-t border-gray-900">
-        <button onclick="openClientView('${inv.id}')" class="btn-o text-[11px] py-2 px-3">${t('act_preview')}</button>
-        ${st!=='paid' ? `<button onclick="markPaid('${inv.id}')" class="btn-o text-[11px] py-2 px-3 text-indigo-400 border-indigo-900 hover:border-indigo-600">${t('act_paid')}</button>` : ''}
+        ${clientUrl ? `<button onclick="navigator.clipboard.writeText('${clientUrl}').then(()=>toast('📋','${t('t_copied')}'))" class="btn-o text-[11px] py-2 px-3">${t('act_preview')}</button>` : ''}
+        ${st !== 'paid' ? `<button onclick="markPaid('${inv.id}')" class="btn-o text-[11px] py-2 px-3 text-indigo-400 border-indigo-900 hover:border-indigo-600">${t('act_paid')}</button>` : ''}
+        <button onclick="exportPDF('${inv.id}')" class="btn-o text-[11px] py-2 px-3">📄 PDF</button>
         <button onclick="delInv('${inv.id}')" class="btn-o text-[11px] py-2 px-3 text-red-400 border-red-900 hover:border-red-600 ml-auto">${t('act_del')}</button>
       </div>
     </div>`;
   }).join('');
 }
 
-function markPaid(id) {
-  const inv = S.invoices.find(i => i.id === id);
-  if (inv) { inv.status = 'paid'; save(); renderDash(); toast('💜', t('t_paid')); }
+async function markPaid(id) {
+  try {
+    const { error } = await _sb.from('invoices').update({ status: 'paid' }).eq('id', id).eq('user_id', USER.id);
+    if (error) throw error;
+    const inv = S.invoices.find(i => i.id === id);
+    if (inv) inv.status = 'paid';
+    renderDash();
+    toast('💜', t('t_paid'));
+  } catch (err) {
+    toast('❌', err.message || 'Failed to update');
+  }
 }
 
-function delInv(id) {
+async function delInv(id) {
   if (!confirm(t('c_del'))) return;
-  S.invoices = S.invoices.filter(i => i.id !== id);
-  save(); renderDash(); toast('🗑️', t('t_del'));
+  try {
+    const { error } = await _sb.from('invoices').delete().eq('id', id).eq('user_id', USER.id);
+    if (error) throw error;
+    S.invoices = S.invoices.filter(i => i.id !== id);
+    renderDash();
+    toast('🗑️', t('t_del'));
+  } catch (err) {
+    toast('❌', err.message || 'Failed to delete');
+  }
 }
 
-// ── ANALYTICS ──────────────────────────────────────────────────────────
+// ── ANALYTICS ─────────────────────────────────────────────────────────
 function renderAnalytics() {
-  const paid = S.invoices.filter(i => i.status==='paid').reduce((s,i)=>s+parseFloat(i.total),0);
-  const out  = S.invoices.filter(i => i.status!=='paid').reduce((s,i)=>s+parseFloat(i.total),0);
-  const avg  = S.invoices.length ? (paid+out)/S.invoices.length : 0;
+  const paid = S.invoices.filter(i => i.status === 'paid').reduce((s,i)  => s + parseFloat(i.total||0), 0);
+  const out  = S.invoices.filter(i => i.status !== 'paid').reduce((s,i)  => s + parseFloat(i.total||0), 0);
+  const avg  = S.invoices.length ? (paid + out) / S.invoices.length : 0;
 
   document.getElementById('an-earned').textContent = fmt(paid);
   document.getElementById('an-out').textContent    = fmt(out);
   document.getElementById('an-avg').textContent    = fmt(avg);
 
-  const MO = S.lang==='it'
+  const MO = S.lang === 'it'
     ? ['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic']
     : ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
   const buckets = {};
   S.invoices.forEach(inv => {
-    if (inv.status==='paid' && inv.issueDate) {
+    if (inv.status === 'paid' && inv.issueDate) {
       const d = new Date(inv.issueDate);
       const k = `${d.getFullYear()}-${d.getMonth()}`;
-      buckets[k] = (buckets[k]||0) + parseFloat(inv.total);
+      buckets[k] = (buckets[k] || 0) + parseFloat(inv.total||0);
     }
   });
 
-  const labels=[], data=[];
-  for (let i=11; i>=0; i--) {
-    const d=new Date(); d.setMonth(d.getMonth()-i);
+  const labels = [], data = [];
+  for (let i = 11; i >= 0; i--) {
+    const d = new Date(); d.setMonth(d.getMonth() - i);
     labels.push(MO[d.getMonth()]);
-    data.push(buckets[`${d.getFullYear()}-${d.getMonth()}`]||0);
+    data.push(buckets[`${d.getFullYear()}-${d.getMonth()}`] || 0);
   }
 
   if (revChart) revChart.destroy();
@@ -941,27 +1441,30 @@ function renderAnalytics() {
       labels,
       datasets: [{
         data,
-        backgroundColor: data.map(v => v>0 ? 'rgba(255,204,0,0.65)' : 'rgba(255,255,255,0.03)'),
-        borderColor:      data.map(v => v>0 ? '#ffcc00'              : 'rgba(255,255,255,0.05)'),
+        backgroundColor: data.map(v => v > 0 ? 'rgba(255,204,0,0.65)' : 'rgba(255,255,255,0.03)'),
+        borderColor:      data.map(v => v > 0 ? '#ffcc00'              : 'rgba(255,255,255,0.05)'),
         borderWidth: 1, borderRadius: 6
       }]
     },
     options: {
       responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display:false }, tooltip: { callbacks: { label: c => ` ${fmt(c.raw)}` } }},
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ` ${fmt(c.raw)}` } } },
       scales: {
-        x: { grid:{ color:'rgba(255,255,255,0.03)' }, ticks:{ color:'#555', font:{weight:'bold',size:10} } },
-        y: { grid:{ color:'rgba(255,255,255,0.04)' }, ticks:{ color:'#555', size:10, callback: v => sym()+v } }
+        x: { grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: '#555', font: { weight: 'bold', size: 10 } } },
+        y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#555', size: 10, callback: v => sym() + v } }
       }
     }
   });
 
-  // Top clients
   const cm = {};
-  S.invoices.forEach(i => { cm[i.client]=(cm[i.client]||{t:0,c:0}); cm[i.client].t+=parseFloat(i.total); cm[i.client].c++; });
-  const top = Object.entries(cm).sort((a,b)=>b[1].t-a[1].t).slice(0,5);
+  S.invoices.forEach(i => {
+    if (!cm[i.client]) cm[i.client] = { t: 0, c: 0 };
+    cm[i.client].t += parseFloat(i.total||0);
+    cm[i.client].c++;
+  });
+  const top = Object.entries(cm).sort((a,b) => b[1].t - a[1].t).slice(0, 5);
   const el  = document.getElementById('top-clients');
-  if (!top.length) { el.innerHTML=`<div class="text-gray-600 text-sm">${t('no_clients')}</div>`; return; }
+  if (!top.length) { el.innerHTML = `<div class="text-gray-600 text-sm">${t('no_clients')}</div>`; return; }
   const mx = top[0][1].t;
   el.innerHTML = top.map(([n,d]) => `
     <div class="flex items-center gap-4">
@@ -974,88 +1477,113 @@ function renderAnalytics() {
     </div>`).join('');
 }
 
-// ── SETTINGS ───────────────────────────────────────────────────────────
+// ── SETTINGS ──────────────────────────────────────────────────────────
 function loadSetForm() {
-  document.getElementById('s-name').value  = S.settings.name||'';
-  document.getElementById('s-email').value = S.settings.email||'';
-  document.getElementById('s-vat').value   = S.settings.vat||'';
-  document.getElementById('s-addr').value  = S.settings.address||'';
-  document.getElementById('s-rate').value  = S.settings.defaultRate||50;
-  document.getElementById('s-tax').value   = S.settings.taxRate||15;
-  document.getElementById('s-cur').value   = S.settings.currency||'EUR';
-  document.getElementById('s-terms').value = S.settings.terms||'';
-  document.getElementById('s-days').value  = S.settings.dueDays||30;
+  document.getElementById('s-name').value  = S.settings.name        || '';
+  document.getElementById('s-email').value = S.settings.email       || '';
+  document.getElementById('s-vat').value   = S.settings.vat         || '';
+  document.getElementById('s-addr').value  = S.settings.address     || '';
+  document.getElementById('s-rate').value  = S.settings.defaultRate || 50;
+  document.getElementById('s-tax').value   = S.settings.taxRate     || 15;
+  document.getElementById('s-cur').value   = S.settings.currency    || 'EUR';
+  document.getElementById('s-terms').value = S.settings.terms       || '';
+  document.getElementById('s-days').value  = S.settings.dueDays     || 30;
 }
 
-function saveSettings() {
+async function saveSettings() {
+  const btn = document.getElementById('btn-save-settings');
+  btn.disabled = true;
+  btn.textContent = '...';
+
   S.settings = {
     name:        document.getElementById('s-name').value.trim(),
     email:       document.getElementById('s-email').value.trim(),
     vat:         document.getElementById('s-vat').value.trim(),
     address:     document.getElementById('s-addr').value.trim(),
-    defaultRate: parseFloat(document.getElementById('s-rate').value)||50,
-    taxRate:     parseFloat(document.getElementById('s-tax').value)||15,
+    defaultRate: parseFloat(document.getElementById('s-rate').value) || 50,
+    taxRate:     parseFloat(document.getElementById('s-tax').value)  || 15,
     currency:    document.getElementById('s-cur').value,
     terms:       document.getElementById('s-terms').value.trim(),
-    dueDays:     parseInt(document.getElementById('s-days').value)||30,
+    dueDays:     parseInt(document.getElementById('s-days').value)   || 30,
   };
-  save(); toast('✅', t('t_saved'));
+
+  try {
+    const { error } = await _sb.from('settings').upsert({
+      user_id:      USER.id,
+      name:         S.settings.name,
+      email:        S.settings.email,
+      vat:          S.settings.vat,
+      address:      S.settings.address,
+      default_rate: S.settings.defaultRate,
+      tax_rate:     S.settings.taxRate,
+      currency:     S.settings.currency,
+      terms:        S.settings.terms,
+      due_days:     S.settings.dueDays,
+      lang:         S.lang,
+      updated_at:   new Date().toISOString()
+    });
+    if (error) throw error;
+    toast('✅', t('t_saved'));
+  } catch (err) {
+    toast('❌', err.message || 'Failed to save settings');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = t('btn_save');
+  }
 }
 
-function clearData() {
+async function clearData() {
   if (!confirm(t('c_clear'))) return;
-  localStorage.removeItem('df2');
-  location.reload();
+  try {
+    const { error } = await _sb.from('invoices').delete().eq('user_id', USER.id);
+    if (error) throw error;
+    S.invoices = [];
+    renderDash();
+    toast('🗑️', t('t_cleared'));
+    showView('dashboard');
+  } catch (err) {
+    toast('❌', err.message || 'Failed to clear data');
+  }
 }
 
-// ── PDF EXPORT ─────────────────────────────────────────────────────────
+// ── PDF EXPORT ────────────────────────────────────────────────────────
 function exportPDF(id) {
   const inv = S.invoices.find(i => i.id === id);
-  if (!inv || !window.jspdf) { toast('⚠️','jsPDF not loaded'); return; }
+  if (!inv || !window.jspdf) { toast('⚠️', 'jsPDF not loaded'); return; }
   const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4' });
-  const W=210, M=18;
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const W = 210, M = 18;
   let y = M;
 
-  // Dark header band
   doc.setFillColor(10,10,10);
   doc.rect(0,0,W,46,'F');
-
-  // Logo
   doc.setFontSize(20); doc.setFont('helvetica','bold');
   doc.setTextColor(255,255,255); doc.text('DU', M, y+11);
   doc.setTextColor(255,204,0);   doc.text('FATTUR', M+12, y+11);
-
-  // Invoice type & ID
   doc.setFontSize(9);  doc.setFont('helvetica','normal');
   doc.setTextColor(160,160,160); doc.text(t('pdf_type'), W-M, y+7, {align:'right'});
   doc.setFontSize(13); doc.setFont('helvetica','bold');
   doc.setTextColor(255,255,255); doc.text(inv.id, W-M, y+15, {align:'right'});
 
   y = 54;
-
-  // From / To
   doc.setFontSize(7.5); doc.setFont('helvetica','bold'); doc.setTextColor(140,140,140);
-  doc.text(t('pdf_from'), M, y);      doc.text(t('pdf_to'), 112, y);
+  doc.text(t('pdf_from'), M, y); doc.text(t('pdf_to'), 112, y);
   y += 5;
   doc.setFontSize(11); doc.setFont('helvetica','bold'); doc.setTextColor(20,20,20);
-  doc.text(S.settings.name||'Freelancer', M, y);
+  doc.text(S.settings.name || 'Freelancer', M, y);
   doc.text(inv.client, 112, y);
   y += 5;
   doc.setFontSize(8.5); doc.setFont('helvetica','normal'); doc.setTextColor(90,90,90);
-  if (S.settings.vat)       doc.text(`${t('pdf_vat')}: ${S.settings.vat}`, M, y);
-  if (S.settings.address) { y+=4; doc.text(S.settings.address, M, y); }
-  if (inv.clientEmail)      doc.text(inv.clientEmail, 112, y-4);
-
+  if (S.settings.vat)      doc.text(`${t('pdf_vat')}: ${S.settings.vat}`, M, y);
+  if (S.settings.address) { y += 4; doc.text(S.settings.address, M, y); }
+  if (inv.clientEmail)     doc.text(inv.clientEmail, 112, y-4);
   y += 13;
 
-  // Dates
   doc.setFontSize(7.5); doc.setFont('helvetica','bold'); doc.setTextColor(140,140,140);
   doc.text(`${t('pdf_date')}: ${inv.issueDate||'-'}`, M, y);
   if (inv.dueDate) doc.text(`${t('pdf_due')}: ${inv.dueDate}`, 95, y);
   y += 10;
 
-  // Table header
   doc.setFillColor(235,235,235);
   doc.rect(M, y-3.5, W-2*M, 9, 'F');
   doc.setFontSize(7.5); doc.setFont('helvetica','bold'); doc.setTextColor(60,60,60);
@@ -1065,20 +1593,18 @@ function exportPDF(id) {
   doc.text(t('pdf_amt'), W-M-1, y+2, {align:'right'});
   y += 9;
 
-  // Rows
   doc.setFont('helvetica','normal'); doc.setTextColor(30,30,30);
   inv.items.forEach((it, idx) => {
     if (idx%2===1) { doc.setFillColor(248,248,248); doc.rect(M, y-3.5, W-2*M, 9, 'F'); }
     doc.setFontSize(9);
-    doc.text(it.desc,                    M+2,    y+2);
-    doc.text(String(it.hours),           134,    y+2);
-    doc.text(`${sym()}${it.rate}`,        155,    y+2);
+    doc.text(it.desc,                          M+2,    y+2);
+    doc.text(String(it.hours),                 134,    y+2);
+    doc.text(`${sym()}${it.rate}`,              155,    y+2);
     doc.text(`${sym()}${it.amount.toFixed(2)}`, W-M-1, y+2, {align:'right'});
     y += 9;
   });
   y += 3;
 
-  // Total bar
   doc.setFillColor(10,10,10);
   doc.rect(M, y-2, W-2*M, 12, 'F');
   doc.setFontSize(10); doc.setFont('helvetica','bold');
@@ -1086,10 +1612,9 @@ function exportPDF(id) {
   doc.setTextColor(255,204,0);   doc.text(`${sym()} ${parseFloat(inv.total).toFixed(2)}`, W-M-3, y+6, {align:'right'});
   y += 18;
 
-  // Notes
   if (inv.notes) {
     doc.setFontSize(7.5); doc.setFont('helvetica','bold'); doc.setTextColor(140,140,140);
-    doc.text(t('pdf_notes'), M, y); y+=4;
+    doc.text(t('pdf_notes'), M, y); y += 4;
     doc.setFont('helvetica','normal'); doc.setTextColor(90,90,90); doc.setFontSize(8);
     doc.text(doc.splitTextToSize(inv.notes, W-2*M), M, y);
   }
@@ -1098,29 +1623,10 @@ function exportPDF(id) {
   toast('📄', t('t_pdf'));
 }
 
-// ── TOAST ──────────────────────────────────────────────────────────────
-function toast(ico, msg) {
-  const el = document.getElementById('toast');
-  document.getElementById('toast-ico').textContent = ico;
-  document.getElementById('toast-msg').textContent = msg;
-  el.classList.remove('hidden','toast-enter');
-  void el.offsetWidth; // reflow
-  el.classList.add('toast-enter');
-  el.classList.remove('hidden');
-  clearTimeout(window._tt);
-  window._tt = setTimeout(() => el.classList.add('hidden'), 3500);
-}
-
-// ── BOOT ───────────────────────────────────────────────────────────────
+// ── BOOT ──────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
-  load();
-  // Apply lang toggle UI
-  const cls_a = 'flex-1 py-2 rounded-lg text-xs font-black transition bg-accent text-black';
-  const cls_i = 'flex-1 py-2 rounded-lg text-xs font-black transition text-gray-600 hover:text-white';
-  document.getElementById('lang-it').className = S.lang==='it' ? cls_a : cls_i;
-  document.getElementById('lang-en').className = S.lang==='en' ? cls_a : cls_i;
-  applyTr();
-  renderDash();
+  showView('loading', { msg: 'Starting...' });
+  boot();
 });
 </script>
 </body>
