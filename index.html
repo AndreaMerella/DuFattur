@@ -939,7 +939,8 @@ async function doLogin() {
     document.getElementById('login-form-wrap').classList.add('hidden');
     document.getElementById('login-sent').classList.remove('hidden');
   } catch (err) {
-    errEl.textContent = err.message || 'Failed to send magic link.';
+    errEl.textContent = (err.message || 'Failed to send magic link.') + (err.status ? ' ['+err.status+']' : '');
+    console.error('OTP error full:', JSON.stringify(err));
     errEl.classList.remove('hidden');
     btn.disabled = false;
     btn.textContent = 'SEND MAGIC LINK';
