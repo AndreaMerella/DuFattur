@@ -91,7 +91,68 @@
             overflow-y: auto; line-height: 1.6;
         }
 
-        @media (max-width: 768px) { .sl { display: none !important; } aside { width: 66px !important; } }
+        /* ── MOBILE ─────────────────────────────────────────────────── */
+        @media (max-width: 768px) {
+            /* Sidebar collapses to icon-only strip */
+            .sl { display: none !important; }
+            aside { width: 58px !important; padding: 16px 6px !important; }
+            aside .px-3 { padding: 0 !important; display: flex; justify-content: center; }
+            aside .px-3 .font-black { font-size: 0.75rem !important; }
+            aside .px-3 div:last-child { display: none; }
+            .nav-btn { padding: 10px 8px !important; justify-content: center !important; }
+
+            /* Main content full width */
+            #main-content { padding: 0 !important; }
+
+            /* Dashboard */
+            #view-dashboard { padding: 16px 14px !important; }
+            #view-dashboard header h1 { font-size: 1.5rem !important; }
+            #view-dashboard .grid { gap: 10px !important; }
+
+            /* KPI cards 2-col */
+            #view-dashboard .grid.grid-cols-2 { grid-template-columns: repeat(2,1fr) !important; }
+            #view-dashboard .grid.grid-cols-4,
+            #view-dashboard .grid-cols-4 { grid-template-columns: repeat(2,1fr) !important; }
+
+            /* Timer card */
+            #view-dashboard .lg\\:col-span-2 { grid-column: span 1 !important; }
+            #live-earn { font-size: 2.5rem !important; }
+
+            /* Invoice list rows */
+            .inv-row { padding: 13px 12px !important; }
+            .inv-row .flex { flex-wrap: wrap; gap: 8px !important; }
+            .inv-row .text-lg { font-size: 1rem !important; }
+
+            /* Invoice form */
+            #view-invoice { padding: 16px 14px !important; }
+            #view-invoice header h1 { font-size: 1.5rem !important; }
+            #view-invoice .grid { grid-template-columns: 1fr !important; }
+            #items-box [id^="row-"] { grid-template-columns: 1fr 64px 64px 24px !important; gap: 6px !important; }
+
+            /* Analytics */
+            #view-analytics { padding: 16px 14px !important; }
+            #view-analytics header h1 { font-size: 1.5rem !important; }
+            #view-analytics .grid { grid-template-columns: 1fr !important; }
+
+            /* Settings */
+            #view-settings { padding: 16px 14px !important; }
+            #view-settings header h1 { font-size: 1.5rem !important; }
+            #view-settings .grid { grid-template-columns: 1fr !important; }
+
+            /* Client view */
+            #view-client { padding: 12px !important; margin-top: 0 !important; }
+            #view-client .bg-white { border-radius: 18px !important; }
+
+            /* Buttons full width on mobile */
+            .inv-row .flex-wrap.gap-2 { gap: 6px !important; }
+            .inv-row .btn-o { font-size: 10px !important; padding: 8px 10px !important; }
+
+            /* Login view */
+            #view-login { padding: 20px 16px !important; }
+
+            /* Lang toggle */
+            aside .mt-4 { margin-top: 8px !important; }
+        }
     </style>
 </head>
 <body class="h-screen flex overflow-hidden">
