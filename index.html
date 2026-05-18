@@ -1051,6 +1051,8 @@ function applyTr() {
     const el = document.getElementById(id);
     if (el) el.className = (id === 'lang-'+S.lang) ? cls_a : cls_i;
   });
+  // Re-apply country-specific labels after language change
+  onCountryChange();
 }
 
 function setLang(l) {
@@ -1514,7 +1516,8 @@ function recalc() {
   });
 
   const vatEnabled = S.settings.vatEnabled && !S.settings.kleinunternehmer && !S.settings.autoentrepreneur;
-  const vatPct     = vatEnabled ? (parseFloat(document.getElementById('s-vat-rate')?.value || S.settings.vatOnInvoice) || 0) : 0;
+  const domRate    = parseFloat(document.getElementById('s-vat-rate')?.value);
+  const vatPct     = vatEnabled ? ((!isNaN(domRate) ? domRate : null) ?? S.settings.vatOnInvoice ?? 22) : 0;
   const vatAmt     = subtotal * vatPct / 100;
   const ritenuta   = S.settings.ritenuta ? subtotal * 0.20 : 0;
   const total      = subtotal + vatAmt - ritenuta;
