@@ -45,3 +45,23 @@ create policy "anon_approve" on public.invoices for update to anon
 -- Authenticated owner: full CRUD on settings
 create policy "owner_settings" on public.settings for all to authenticated
   using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- ── MIGRATION v3.1: International Compliance ──────────────────────────
+-- Run this in Supabase SQL Editor if you already have the tables above.
+
+alter table public.settings
+  add column if not exists country          text          default 'IT',
+  add column if not exists vat2             text,
+  add column if not exists iban             text,
+  add column if not exists vat_on_invoice   numeric(5,2)  default 22,
+  add column if not exists vat_enabled      boolean       default true,
+  add column if not exists ritenuta         boolean       default false,
+  add column if not exists kleinunternehmer boolean       default false,
+  add column if not exists autoentrepreneur boolean       default false;
+
+alter table public.invoices
+  add column if not exists subtotal          numeric(12,2) default 0,
+  add column if not exists vat_amount        numeric(12,2) default 0,
+  add column if not exists vat_rate          numeric(5,2)  default 0,
+  add column if not exists ritenuta_amount   numeric(12,2) default 0,
+  add column if not exists tax_name          text;

@@ -227,33 +227,46 @@
                         <div class="font-bold text-sm text-white mb-2">Run this SQL in the SQL Editor</div>
                         <div class="relative">
                             <pre id="schema-pre" class="sql-block">create table if not exists public.invoices (
-  id            text          primary key,
-  public_token  uuid          not null default gen_random_uuid(),
-  user_id       uuid          not null references auth.users(id) on delete cascade,
-  client        text          not null,
-  client_email  text,
-  issue_date    date,
-  due_date      date,
-  notes         text,
-  items         jsonb         not null default '[]',
-  total         numeric(12,2) not null default 0,
-  status        text          not null default 'pending' check (status in ('pending','approved','paid')),
-  created_at    timestamptz   not null default now()
+  id               text          primary key,
+  public_token     uuid          not null default gen_random_uuid(),
+  user_id          uuid          not null references auth.users(id) on delete cascade,
+  client           text          not null,
+  client_email     text,
+  issue_date       date,
+  due_date         date,
+  notes            text,
+  items            jsonb         not null default '[]',
+  total            numeric(12,2) not null default 0,
+  subtotal         numeric(12,2) default 0,
+  vat_amount       numeric(12,2) default 0,
+  vat_rate         numeric(5,2)  default 0,
+  ritenuta_amount  numeric(12,2) default 0,
+  tax_name         text,
+  status           text          not null default 'pending' check (status in ('pending','approved','paid')),
+  created_at       timestamptz   not null default now()
 );
 
 create table if not exists public.settings (
-  user_id       uuid          primary key references auth.users(id) on delete cascade,
-  name          text,
-  email         text,
-  vat           text,
-  address       text,
-  default_rate  numeric(10,2) default 50,
-  tax_rate      numeric(5,2)  default 15,
-  currency      text          default 'EUR',
-  terms         text,
-  due_days      integer       default 30,
-  lang          text          default 'it',
-  updated_at    timestamptz   default now()
+  user_id          uuid          primary key references auth.users(id) on delete cascade,
+  name             text,
+  email            text,
+  vat              text,
+  vat2             text,
+  address          text,
+  iban             text,
+  country          text          default 'IT',
+  default_rate     numeric(10,2) default 50,
+  tax_rate         numeric(5,2)  default 15,
+  vat_on_invoice   numeric(5,2)  default 22,
+  vat_enabled      boolean       default true,
+  ritenuta         boolean       default false,
+  kleinunternehmer boolean       default false,
+  autoentrepreneur boolean       default false,
+  currency         text          default 'EUR',
+  terms            text,
+  due_days         integer       default 30,
+  lang             text          default 'it',
+  updated_at       timestamptz   default now()
 );
 
 alter table public.invoices enable row level security;
@@ -456,9 +469,23 @@ create policy "owner_settings" on public.settings for all to authenticated
                 </div>
 
                 <!-- Total preview -->
-                <div class="bg-black rounded-xl px-5 py-4 mb-6 flex justify-between items-center border border-gray-800">
-                    <span class="text-gray-400 font-bold text-sm" data-i18n="lbl_total">Totale</span>
-                    <span class="text-xl font-black text-accent" id="total-preview">€ 0.00</span>
+                <div class="bg-black rounded-xl px-5 py-4 mb-6 border border-gray-800 space-y-2">
+                    <div class="flex justify-between items-center text-sm">
+                        <span class="text-gray-500" data-i18n="lbl_subtotal">Subtotale</span>
+                        <span class="font-bold text-gray-300" id="preview-subtotal">€ 0.00</span>
+                    </div>
+                    <div id="preview-vat-row" class="flex justify-between items-center text-sm">
+                        <span class="text-gray-500" id="preview-vat-label">IVA 22%</span>
+                        <span class="font-bold text-gray-300" id="preview-vat">€ 0.00</span>
+                    </div>
+                    <div id="preview-ritenuta-row" class="hidden flex justify-between items-center text-sm">
+                        <span class="text-gray-500" data-i18n="lbl_ritenuta">Ritenuta (20%)</span>
+                        <span class="font-bold text-red-400" id="preview-ritenuta">- € 0.00</span>
+                    </div>
+                    <div class="flex justify-between items-center border-t border-gray-800 pt-2">
+                        <span class="text-gray-400 font-bold text-sm" data-i18n="lbl_total">Totale</span>
+                        <span class="text-xl font-black text-accent" id="total-preview">€ 0.00</span>
+                    </div>
                 </div>
 
                 <!-- Dates -->
@@ -530,6 +557,21 @@ create policy "owner_settings" on public.settings for all to authenticated
 
             <div class="px-7 py-5 border-b border-gray-100" id="cv-items"></div>
 
+            <!-- Tax breakdown (hidden if no VAT/ritenuta) -->
+            <div id="cv-tax-breakdown" class="hidden px-7 py-3 border-b border-gray-100 space-y-1.5">
+                <div class="flex justify-between text-sm">
+                    <span class="text-gray-500" data-i18n="lbl_subtotal">Subtotale</span>
+                    <span class="font-bold text-gray-700" id="cv-subtotal">€ 0.00</span>
+                </div>
+                <div id="cv-vat-row" class="hidden flex justify-between text-sm">
+                    <span class="text-gray-500" id="cv-vat-label">IVA 22%</span>
+                    <span class="font-bold text-gray-700" id="cv-vat-amt">€ 0.00</span>
+                </div>
+                <div id="cv-ritenuta-row" class="hidden flex justify-between text-sm">
+                    <span class="text-gray-500" data-i18n="lbl_ritenuta">Ritenuta (20%)</span>
+                    <span class="font-bold text-red-500" id="cv-ritenuta-amt">- € 0.00</span>
+                </div>
+            </div>
             <div class="px-7 py-4 border-b border-gray-100 flex justify-between items-center">
                 <span class="font-black text-gray-700 uppercase text-sm" data-i18n="cv_tot">Totale da Saldare</span>
                 <span class="font-black text-2xl" id="cv-total">€ 0.00</span>
@@ -606,6 +648,23 @@ create policy "owner_settings" on public.settings for all to authenticated
         <div class="flex flex-col gap-5">
             <div class="card" style="background:#0e0e0e;border-color:#1e1e1e;">
                 <h3 class="text-[10px] font-black uppercase tracking-widest text-gray-500 mb-5" data-i18n="set_prof">Profilo Freelance</h3>
+                <div class="mb-4">
+                    <label class="block text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-2" data-i18n="set_country">Paese</label>
+                    <select id="s-country" class="ifield" onchange="onCountryChange()">
+                        <option value="IT">🇮🇹 Italy</option>
+                        <option value="NL">🇳🇱 Netherlands</option>
+                        <option value="DE">🇩🇪 Germany</option>
+                        <option value="GB">🇬🇧 United Kingdom</option>
+                        <option value="FR">🇫🇷 France</option>
+                        <option value="ES">🇪🇸 Spain</option>
+                        <option value="PT">🇵🇹 Portugal</option>
+                        <option value="CH">🇨🇭 Switzerland</option>
+                        <option value="SE">🇸🇪 Sweden</option>
+                        <option value="US">🇺🇸 United States</option>
+                        <option value="CA">🇨🇦 Canada</option>
+                        <option value="AU">🇦🇺 Australia</option>
+                    </select>
+                </div>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                         <label class="block text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-2" data-i18n="set_name">Nome / Ragione Sociale</label>
@@ -616,19 +675,27 @@ create policy "owner_settings" on public.settings for all to authenticated
                         <input type="email" id="s-email" class="ifield" placeholder="you@email.com">
                     </div>
                     <div>
-                        <label class="block text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-2" data-i18n="set_vat">P.IVA / VAT</label>
+                        <label id="s-vat-label" class="block text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-2">P.IVA</label>
                         <input type="text" id="s-vat" class="ifield" placeholder="IT12345678901">
                     </div>
-                    <div>
+                    <div id="s-vat2-wrap">
+                        <label id="s-vat2-label" class="block text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-2">Codice Fiscale</label>
+                        <input type="text" id="s-vat2" class="ifield" placeholder="RSSMRA80A01H501U">
+                    </div>
+                    <div class="sm:col-span-2">
                         <label class="block text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-2" data-i18n="set_addr">Indirizzo</label>
                         <input type="text" id="s-addr" class="ifield" data-phi="ph_saddr">
+                    </div>
+                    <div id="s-iban-wrap" class="sm:col-span-2">
+                        <label class="block text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-2" data-i18n="set_iban">IBAN Bancario</label>
+                        <input type="text" id="s-iban" class="ifield" placeholder="IT60 X054 2811 1010 0000 0123 456">
                     </div>
                 </div>
             </div>
 
             <div class="card" style="background:#0e0e0e;border-color:#1e1e1e;">
                 <h3 class="text-[10px] font-black uppercase tracking-widest text-gray-500 mb-5" data-i18n="set_fin">Preferenze Finanziarie</h3>
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-5">
                     <div>
                         <label class="block text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-2" data-i18n="set_rate">Tariffa Default (€/h)</label>
                         <input type="number" id="s-rate" min="1" class="ifield" placeholder="50">
@@ -644,11 +711,63 @@ create policy "owner_settings" on public.settings for all to authenticated
                             <option value="USD">USD ($)</option>
                             <option value="GBP">GBP (£)</option>
                             <option value="CHF">CHF (Fr.)</option>
+                            <option value="AUD">AUD (A$)</option>
+                            <option value="CAD">CAD (C$)</option>
                             <option value="DKK">DKK (kr)</option>
                             <option value="SEK">SEK (kr)</option>
                             <option value="NOK">NOK (kr)</option>
                         </select>
                     </div>
+                </div>
+                <!-- VAT settings -->
+                <div class="border-t border-gray-800 pt-4">
+                    <div class="flex items-center justify-between mb-3">
+                        <div>
+                            <div class="text-[10px] text-gray-500 font-bold uppercase tracking-widest" data-i18n="set_vat_enabled">Applica IVA in fattura</div>
+                            <div id="vat-tax-name-hint" class="text-[10px] text-gray-700 mt-0.5">IVA 22%</div>
+                        </div>
+                        <button type="button" id="toggle-vat" onclick="toggleVatEnabled()" class="w-12 h-6 rounded-full transition-colors relative bg-accent">
+                            <span id="toggle-vat-knob" class="absolute top-1 right-1 w-4 h-4 bg-black rounded-full transition-transform"></span>
+                        </button>
+                    </div>
+                    <div id="vat-rate-row" class="flex items-center gap-3">
+                        <div class="flex-1">
+                            <label class="block text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-2" data-i18n="set_vat_rate">Aliquota IVA (%)</label>
+                            <input type="number" id="s-vat-rate" min="0" max="100" step="0.1" class="ifield" placeholder="22">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Special regime toggles -->
+            <div id="regime-card" class="card hidden" style="background:#0e0e0e;border-color:#1e1e1e;">
+                <h3 class="text-[10px] font-black uppercase tracking-widest text-gray-500 mb-4" data-i18n="set_regime">Regime Fiscale Speciale</h3>
+                <div id="toggle-ritenuta-wrap" class="hidden flex items-center justify-between py-3 border-b border-gray-800">
+                    <div>
+                        <div class="text-sm font-bold text-white" data-i18n="set_ritenuta">Ritenuta d'Acconto (20%)</div>
+                        <div class="text-[11px] text-gray-600 mt-0.5">Deduzione del 20% dal totale</div>
+                    </div>
+                    <button type="button" id="toggle-ritenuta" onclick="toggleRegime('ritenuta')" class="w-12 h-6 rounded-full transition-colors relative bg-gray-800">
+                        <span id="toggle-ritenuta-knob" class="absolute top-1 left-1 w-4 h-4 bg-gray-600 rounded-full transition-transform"></span>
+                    </button>
+                </div>
+                <div id="toggle-kleinunternehmer-wrap" class="hidden flex items-center justify-between py-3 border-b border-gray-800">
+                    <div>
+                        <div class="text-sm font-bold text-white" data-i18n="set_kleinunternehmer">Kleinunternehmer (§19 UStG)</div>
+                        <div class="text-[11px] text-gray-600 mt-0.5">Keine Mehrwertsteuer ausweisen</div>
+                    </div>
+                    <button type="button" id="toggle-kleinunternehmer" onclick="toggleRegime('kleinunternehmer')" class="w-12 h-6 rounded-full transition-colors relative bg-gray-800">
+                        <span id="toggle-kleinunternehmer-knob" class="absolute top-1 left-1 w-4 h-4 bg-gray-600 rounded-full transition-transform"></span>
+                    </button>
+                </div>
+                <div id="toggle-autoentrepreneur-wrap" class="hidden flex items-center justify-between py-3">
+                    <div>
+                        <div class="text-sm font-bold text-white" data-i18n="set_autoentrepreneur">Auto-entrepreneur (TVA exemptée)</div>
+                        <div class="text-[11px] text-gray-600 mt-0.5">TVA non applicable, art. 293 B CGI</div>
+                    </div>
+                    <button type="button" id="toggle-autoentrepreneur" onclick="toggleRegime('autoentrepreneur')" class="w-12 h-6 rounded-full transition-colors relative bg-gray-800">
+                        <span id="toggle-autoentrepreneur-knob" class="absolute top-1 left-1 w-4 h-4 bg-gray-600 rounded-full transition-transform"></span>
+                    </button>
                 </div>
             </div>
 
@@ -748,6 +867,14 @@ const L = {
     pdf_type:'PROFORMA', pdf_from:'DA', pdf_to:'A',
     pdf_desc:'DESCRIZIONE', pdf_h:'ORE', pdf_r:'TARIFFA', pdf_amt:'IMPORTO',
     pdf_tot:'TOTALE', pdf_notes:'NOTE', pdf_date:'DATA', pdf_due:'SCADENZA', pdf_vat:'P.IVA',
+    pdf_subtotal:'SUBTOTALE', pdf_vat_amt:'IVA', pdf_ritenuta:'RITENUTA', pdf_iban:'IBAN',
+    set_country:'Paese', set_iban:'IBAN Bancario',
+    set_vat_rate:'Aliquota IVA (%)', set_vat_enabled:'Applica IVA in fattura',
+    set_ritenuta:"Ritenuta d'Acconto (20%)",
+    set_kleinunternehmer:'Kleinunternehmer (esente IVA §19)',
+    set_autoentrepreneur:'Auto-entrepreneur (franchise TVA)',
+    lbl_subtotal:'Subtotale', lbl_vat_amt:'IVA', lbl_ritenuta:'Ritenuta (20%)',
+    set_regime:'Regime Fiscale Speciale',
   },
   en: {
     nav_dash:'Dashboard', nav_inv:'New Invoice', nav_an:'Analytics', nav_set:'Settings',
@@ -799,7 +926,67 @@ const L = {
     pdf_type:'INVOICE', pdf_from:'FROM', pdf_to:'TO',
     pdf_desc:'DESCRIPTION', pdf_h:'HOURS', pdf_r:'RATE', pdf_amt:'AMOUNT',
     pdf_tot:'TOTAL', pdf_notes:'NOTES', pdf_date:'DATE', pdf_due:'DUE', pdf_vat:'VAT',
+    pdf_subtotal:'SUBTOTAL', pdf_vat_amt:'VAT', pdf_ritenuta:'WITHHOLDING', pdf_iban:'IBAN',
+    set_country:'Country', set_iban:'Bank IBAN',
+    set_vat_rate:'VAT Rate (%)', set_vat_enabled:'Apply VAT on invoice',
+    set_ritenuta:'Withholding Tax (20%)',
+    set_kleinunternehmer:'Small Business Exemption (§19 UStG)',
+    set_autoentrepreneur:'Auto-entrepreneur (TVA exempt)',
+    lbl_subtotal:'Subtotal', lbl_vat_amt:'VAT', lbl_ritenuta:'Withholding (20%)',
+    set_regime:'Special Tax Regime',
   }
+};
+
+// ── COUNTRIES ────────────────────────────────────────────────────────
+const COUNTRIES = {
+  IT:{ name:{it:'Italia',en:'Italy'}, currency:'EUR', vatRate:22, taxName:'IVA',
+       id1:{it:'P.IVA',en:'VAT Number'}, id1Ph:'IT12345678901',
+       id2:{it:'Codice Fiscale',en:'Fiscal Code'}, id2Ph:'RSSMRA80A01H501U',
+       requiresIBAN:true, extraToggles:['ritenuta'] },
+  NL:{ name:{it:'Paesi Bassi',en:'Netherlands'}, currency:'EUR', vatRate:21, taxName:'BTW',
+       id1:{it:'KVK Nummer',en:'KVK Number'}, id1Ph:'12345678',
+       id2:{it:'BTW Nummer',en:'BTW Number'}, id2Ph:'NL123456789B01',
+       requiresIBAN:true, extraToggles:[] },
+  DE:{ name:{it:'Germania',en:'Germany'}, currency:'EUR', vatRate:19, taxName:'MwSt',
+       id1:{it:'Steuernummer',en:'Tax Number'}, id1Ph:'12/345/67890',
+       id2:{it:'USt-IdNr.',en:'VAT ID'}, id2Ph:'DE123456789',
+       requiresIBAN:true, extraToggles:['kleinunternehmer'] },
+  GB:{ name:{it:'Regno Unito',en:'United Kingdom'}, currency:'GBP', vatRate:20, taxName:'VAT',
+       id1:{it:'UTR Number',en:'UTR Number'}, id1Ph:'1234567890',
+       id2:{it:'VAT Number',en:'VAT Number'}, id2Ph:'GB123456789',
+       requiresIBAN:false, extraToggles:[] },
+  FR:{ name:{it:'Francia',en:'France'}, currency:'EUR', vatRate:20, taxName:'TVA',
+       id1:{it:'SIRET',en:'SIRET'}, id1Ph:'12345678901234',
+       id2:{it:'Numero TVA',en:'VAT Number'}, id2Ph:'FR12345678901',
+       requiresIBAN:true, extraToggles:['autoentrepreneur'] },
+  ES:{ name:{it:'Spagna',en:'Spain'}, currency:'EUR', vatRate:21, taxName:'IVA',
+       id1:{it:'NIF/CIF',en:'NIF/CIF'}, id1Ph:'B12345678',
+       id2:{it:'',en:''}, id2Ph:'',
+       requiresIBAN:true, extraToggles:[] },
+  PT:{ name:{it:'Portogallo',en:'Portugal'}, currency:'EUR', vatRate:23, taxName:'IVA',
+       id1:{it:'NIF',en:'NIF'}, id1Ph:'123456789',
+       id2:{it:'',en:''}, id2Ph:'',
+       requiresIBAN:true, extraToggles:[] },
+  CH:{ name:{it:'Svizzera',en:'Switzerland'}, currency:'CHF', vatRate:8.1, taxName:'MWST',
+       id1:{it:'UID-Nummer',en:'UID Number'}, id1Ph:'CHE-123.456.789',
+       id2:{it:'',en:''}, id2Ph:'',
+       requiresIBAN:true, extraToggles:[] },
+  US:{ name:{it:'Stati Uniti',en:'United States'}, currency:'USD', vatRate:0, taxName:'Tax',
+       id1:{it:'EIN',en:'EIN'}, id1Ph:'12-3456789',
+       id2:{it:'',en:''}, id2Ph:'',
+       requiresIBAN:false, extraToggles:[] },
+  AU:{ name:{it:'Australia',en:'Australia'}, currency:'AUD', vatRate:10, taxName:'GST',
+       id1:{it:'ABN',en:'ABN'}, id1Ph:'12 345 678 901',
+       id2:{it:'',en:''}, id2Ph:'',
+       requiresIBAN:false, extraToggles:[] },
+  CA:{ name:{it:'Canada',en:'Canada'}, currency:'CAD', vatRate:5, taxName:'GST/HST',
+       id1:{it:'Business Number',en:'Business Number'}, id1Ph:'123456789 RT0001',
+       id2:{it:'',en:''}, id2Ph:'',
+       requiresIBAN:false, extraToggles:[] },
+  SE:{ name:{it:'Svezia',en:'Sweden'}, currency:'SEK', vatRate:25, taxName:'Moms',
+       id1:{it:'Org. nummer',en:'Org. Number'}, id1Ph:'556123-4567',
+       id2:{it:'Moms-nr.',en:'VAT Number'}, id2Ph:'SE123456789001',
+       requiresIBAN:true, extraToggles:[] },
 };
 
 // ── STATE ─────────────────────────────────────────────────────────────
@@ -809,8 +996,10 @@ let S = {
   lang: 'it',
   invoices: [],
   settings: {
-    name:'', email:'', vat:'', address:'',
-    defaultRate: 50, taxRate: 15, currency: 'EUR', terms:'', dueDays: 30
+    name:'', email:'', vat:'', vat2:'', address:'',
+    defaultRate: 50, taxRate: 15, currency: 'EUR', terms:'', dueDays: 30,
+    country:'IT', iban:'', vatOnInvoice:22, vatEnabled:true,
+    ritenuta:false, kleinunternehmer:false, autoentrepreneur:false
   },
   timer: { on: false, earn: 0, elapsed: 0, iv: null, rate: 50 }
 };
@@ -866,7 +1055,6 @@ function applyTr() {
 
 function setLang(l) {
   S.lang = l;
-  // persist to settings table if logged in
   if (_sb && USER) {
     _sb.from('settings').upsert({ lang: l, user_id: USER.id, updated_at: new Date().toISOString() })
       .then(() => {});
@@ -875,6 +1063,118 @@ function setLang(l) {
   const v = document.querySelector('[id^="view-"]:not(.hidden-view)');
   if (v?.id === 'view-dashboard') renderDash();
   if (v?.id === 'view-analytics') renderAnalytics();
+}
+
+// ── COUNTRY / VAT LOGIC ───────────────────────────────────────────────
+function onCountryChange() {
+  const code = document.getElementById('s-country')?.value || S.settings.country || 'IT';
+  const c    = COUNTRIES[code] || COUNTRIES.IT;
+
+  // VAT ID labels
+  const id1Lbl = c.id1[S.lang] || c.id1.en;
+  const id2Lbl = c.id2[S.lang] || c.id2.en;
+  const v1El = document.getElementById('s-vat-label');
+  const v2El = document.getElementById('s-vat2-label');
+  const v2Wrap = document.getElementById('s-vat2-wrap');
+  if (v1El) v1El.textContent = id1Lbl;
+  if (v2El) v2El.textContent = id2Lbl;
+  if (v2Wrap) v2Wrap.classList.toggle('hidden', !id2Lbl);
+  const v1In = document.getElementById('s-vat');
+  const v2In = document.getElementById('s-vat2');
+  if (v1In) v1In.placeholder = c.id1Ph;
+  if (v2In) v2In.placeholder = c.id2Ph;
+
+  // IBAN
+  document.getElementById('s-iban-wrap')?.classList.toggle('hidden', !c.requiresIBAN);
+
+  // VAT rate hint
+  const vatRateEl = document.getElementById('s-vat-rate');
+  const hintEl    = document.getElementById('vat-tax-name-hint');
+  if (vatRateEl && !vatRateEl.value) vatRateEl.value = c.vatRate;
+  if (hintEl) hintEl.textContent = `${c.taxName} ${c.vatRate}%`;
+
+  // Currency auto-suggest
+  const curEl = document.getElementById('s-cur');
+  if (curEl && curEl.value !== c.currency) curEl.value = c.currency;
+
+  // Special regime toggles
+  const regimeCard = document.getElementById('regime-card');
+  if (regimeCard) {
+    const hasToggles = c.extraToggles.length > 0;
+    regimeCard.classList.toggle('hidden', !hasToggles);
+    ['ritenuta','kleinunternehmer','autoentrepreneur'].forEach(key => {
+      const wrap = document.getElementById(`toggle-${key}-wrap`);
+      if (wrap) wrap.classList.toggle('hidden', !c.extraToggles.includes(key));
+    });
+  }
+
+  // Update preview label in invoice form
+  updateVatPreviewLabel();
+}
+
+function updateVatPreviewLabel() {
+  const code = S.settings.country || 'IT';
+  const c    = COUNTRIES[code] || COUNTRIES.IT;
+  const vatPct = parseFloat(document.getElementById('s-vat-rate')?.value || S.settings.vatOnInvoice) || c.vatRate;
+  const label  = `${c.taxName} ${vatPct}%`;
+  const el     = document.getElementById('preview-vat-label');
+  if (el) el.textContent = label;
+}
+
+function toggleVatEnabled() {
+  S.settings.vatEnabled = !S.settings.vatEnabled;
+  const btn  = document.getElementById('toggle-vat');
+  const knob = document.getElementById('toggle-vat-knob');
+  const row  = document.getElementById('vat-rate-row');
+  if (S.settings.vatEnabled) {
+    btn.classList.replace('bg-gray-800','bg-accent');
+    knob.style.transform = 'translateX(0)';
+    knob.classList.replace('bg-gray-600','bg-black');
+    knob.classList.remove('left-1'); knob.classList.add('right-1');
+    if (row) row.classList.remove('hidden');
+  } else {
+    btn.classList.replace('bg-accent','bg-gray-800');
+    knob.style.transform = 'translateX(0)';
+    knob.classList.replace('bg-black','bg-gray-600');
+    knob.classList.remove('right-1'); knob.classList.add('left-1');
+    if (row) row.classList.add('hidden');
+  }
+  recalc();
+}
+
+function toggleRegime(key) {
+  S.settings[key] = !S.settings[key];
+  const btn  = document.getElementById(`toggle-${key}`);
+  const knob = document.getElementById(`toggle-${key}-knob`);
+  if (S.settings[key]) {
+    btn?.classList.replace('bg-gray-800','bg-accent');
+    if (knob) { knob.classList.replace('bg-gray-600','bg-black'); knob.classList.remove('left-1'); knob.classList.add('right-1'); }
+    // Kleinunternehmer & autoentrepreneur disable VAT
+    if (key === 'kleinunternehmer' || key === 'autoentrepreneur') {
+      S.settings.vatEnabled = false;
+      syncVatToggleUI();
+    }
+  } else {
+    btn?.classList.replace('bg-accent','bg-gray-800');
+    if (knob) { knob.classList.replace('bg-black','bg-gray-600'); knob.classList.remove('right-1'); knob.classList.add('left-1'); }
+  }
+  recalc();
+}
+
+function syncVatToggleUI() {
+  const btn  = document.getElementById('toggle-vat');
+  const knob = document.getElementById('toggle-vat-knob');
+  const row  = document.getElementById('vat-rate-row');
+  if (!btn) return;
+  if (S.settings.vatEnabled) {
+    btn.classList.add('bg-accent'); btn.classList.remove('bg-gray-800');
+    if (knob) { knob.classList.add('bg-black'); knob.classList.remove('bg-gray-600','left-1'); knob.classList.add('right-1'); }
+    if (row) row.classList.remove('hidden');
+  } else {
+    btn.classList.remove('bg-accent'); btn.classList.add('bg-gray-800');
+    if (knob) { knob.classList.remove('bg-black','right-1'); knob.classList.add('bg-gray-600','left-1'); }
+    if (row) row.classList.add('hidden');
+  }
 }
 
 // ── VIEW MANAGEMENT ───────────────────────────────────────────────────
@@ -1013,7 +1313,7 @@ async function doLogout() {
   await _sb.auth.signOut();
   USER = null;
   S.invoices = [];
-  S.settings = { name:'', email:'', vat:'', address:'', defaultRate:50, taxRate:15, currency:'EUR', terms:'', dueDays:30 };
+  S.settings = { name:'', email:'', vat:'', vat2:'', address:'', defaultRate:50, taxRate:15, currency:'EUR', terms:'', dueDays:30, country:'IT', iban:'', vatOnInvoice:22, vatEnabled:true, ritenuta:false, kleinunternehmer:false, autoentrepreneur:false };
   showView('login');
 }
 
@@ -1081,15 +1381,23 @@ async function loadApp() {
     if (setRes.data) {
       const d = setRes.data;
       S.settings = {
-        name:        d.name        || '',
-        email:       d.email       || '',
-        vat:         d.vat         || '',
-        address:     d.address     || '',
-        defaultRate: parseFloat(d.default_rate) || 50,
-        taxRate:     parseFloat(d.tax_rate)      || 15,
-        currency:    d.currency    || 'EUR',
-        terms:       d.terms       || '',
-        dueDays:     parseInt(d.due_days)         || 30,
+        country:          d.country          || 'IT',
+        name:             d.name             || '',
+        email:            d.email            || '',
+        vat:              d.vat              || '',
+        vat2:             d.vat2             || '',
+        address:          d.address          || '',
+        iban:             d.iban             || '',
+        defaultRate:      parseFloat(d.default_rate)   || 50,
+        taxRate:          parseFloat(d.tax_rate)        || 15,
+        currency:         d.currency         || 'EUR',
+        vatOnInvoice:     parseFloat(d.vat_on_invoice)  ?? 22,
+        vatEnabled:       d.vat_enabled      !== false,
+        ritenuta:         d.ritenuta         === true,
+        kleinunternehmer: d.kleinunternehmer === true,
+        autoentrepreneur: d.autoentrepreneur === true,
+        terms:            d.terms            || '',
+        dueDays:          parseInt(d.due_days)           || 30,
       };
       if (d.lang) S.lang = d.lang;
     }
@@ -1106,34 +1414,44 @@ async function loadApp() {
 // ── DB MAPPING ────────────────────────────────────────────────────────
 function dbToInv(r) {
   return {
-    id:           r.id,
-    publicToken:  r.public_token,
-    userId:       r.user_id,
-    client:       r.client,
-    clientEmail:  r.client_email || '',
-    issueDate:    r.issue_date   || '',
-    dueDate:      r.due_date     || '',
-    notes:        r.notes        || '',
-    items:        Array.isArray(r.items) ? r.items : (r.items ? JSON.parse(r.items) : []),
-    total:        parseFloat(r.total) || 0,
-    status:       r.status,
-    createdAt:    r.created_at,
+    id:             r.id,
+    publicToken:    r.public_token,
+    userId:         r.user_id,
+    client:         r.client,
+    clientEmail:    r.client_email     || '',
+    issueDate:      r.issue_date       || '',
+    dueDate:        r.due_date         || '',
+    notes:          r.notes            || '',
+    items:          Array.isArray(r.items) ? r.items : (r.items ? JSON.parse(r.items) : []),
+    total:          parseFloat(r.total)        || 0,
+    subtotal:       parseFloat(r.subtotal)     || 0,
+    vatAmount:      parseFloat(r.vat_amount)   || 0,
+    vatRate:        parseFloat(r.vat_rate)     || 0,
+    ritenuteAmount: parseFloat(r.ritenuta_amount) || 0,
+    taxName:        r.tax_name         || '',
+    status:         r.status,
+    createdAt:      r.created_at,
   };
 }
 
 function invToDb(inv) {
   return {
-    id:           inv.id,
-    user_id:      USER.id,
-    client:       inv.client,
-    client_email: inv.clientEmail || null,
-    issue_date:   inv.issueDate   || null,
-    due_date:     inv.dueDate     || null,
-    notes:        inv.notes       || null,
-    items:        inv.items,
-    total:        parseFloat(inv.total),
-    status:       inv.status,
-    created_at:   inv.createdAt,
+    id:               inv.id,
+    user_id:          USER.id,
+    client:           inv.client,
+    client_email:     inv.clientEmail     || null,
+    issue_date:       inv.issueDate       || null,
+    due_date:         inv.dueDate         || null,
+    notes:            inv.notes           || null,
+    items:            inv.items,
+    total:            parseFloat(inv.total),
+    subtotal:         parseFloat(inv.subtotal)      || 0,
+    vat_amount:       parseFloat(inv.vatAmount)     || 0,
+    vat_rate:         parseFloat(inv.vatRate)       || 0,
+    ritenuta_amount:  parseFloat(inv.ritenuteAmount)|| 0,
+    tax_name:         inv.taxName          || null,
+    status:           inv.status,
+    created_at:       inv.createdAt,
   };
 }
 
@@ -1188,14 +1506,39 @@ function delItem(id) {
 }
 
 function recalc() {
-  let tot = 0;
+  let subtotal = 0;
   document.querySelectorAll('[id^="row-"]').forEach(row => {
     const n = row.id.split('-')[1];
-    tot += (parseFloat(document.getElementById(`h-${n}`)?.value)||0) *
-           (parseFloat(document.getElementById(`r-${n}`)?.value)||0);
+    subtotal += (parseFloat(document.getElementById(`h-${n}`)?.value)||0) *
+                (parseFloat(document.getElementById(`r-${n}`)?.value)||0);
   });
-  document.getElementById('total-preview').textContent = fmt(tot);
-  return tot;
+
+  const vatEnabled = S.settings.vatEnabled && !S.settings.kleinunternehmer && !S.settings.autoentrepreneur;
+  const vatPct     = vatEnabled ? (parseFloat(document.getElementById('s-vat-rate')?.value || S.settings.vatOnInvoice) || 0) : 0;
+  const vatAmt     = subtotal * vatPct / 100;
+  const ritenuta   = S.settings.ritenuta ? subtotal * 0.20 : 0;
+  const total      = subtotal + vatAmt - ritenuta;
+
+  const code = S.settings.country || 'IT';
+  const c    = COUNTRIES[code] || COUNTRIES.IT;
+
+  const subEl = document.getElementById('preview-subtotal');
+  const vatEl = document.getElementById('preview-vat');
+  const vatRow = document.getElementById('preview-vat-row');
+  const ritEl = document.getElementById('preview-ritenuta');
+  const ritRow = document.getElementById('preview-ritenuta-row');
+  const totEl = document.getElementById('total-preview');
+  const vatLbl = document.getElementById('preview-vat-label');
+
+  if (subEl)  subEl.textContent  = fmt(subtotal);
+  if (vatLbl) vatLbl.textContent = `${c.taxName} ${vatPct}%`;
+  if (vatEl)  vatEl.textContent  = fmt(vatAmt);
+  if (vatRow) vatRow.classList.toggle('hidden', !vatEnabled || vatPct === 0);
+  if (ritEl)  ritEl.textContent  = `- ${fmt(ritenuta)}`;
+  if (ritRow) ritRow.classList.toggle('hidden', !S.settings.ritenuta);
+  if (totEl)  totEl.textContent  = fmt(total);
+
+  return { subtotal, vatAmt, vatPct, ritenuta, total };
 }
 
 function getItems() {
@@ -1229,17 +1572,25 @@ async function generateInvoice(e) {
   btn.disabled = true;
   btn.textContent = '...';
 
+  const { subtotal, vatAmt, vatPct, ritenuta, total } = recalc();
+  const code = S.settings.country || 'IT';
+  const c    = COUNTRIES[code] || COUNTRIES.IT;
   const inv = {
-    id:          newId(),
-    client:      document.getElementById('in-client').value.trim(),
-    clientEmail: document.getElementById('in-cemail').value.trim(),
-    issueDate:   document.getElementById('in-issue').value,
-    dueDate:     document.getElementById('in-due').value,
-    notes:       document.getElementById('in-notes').value.trim(),
+    id:             newId(),
+    client:         document.getElementById('in-client').value.trim(),
+    clientEmail:    document.getElementById('in-cemail').value.trim(),
+    issueDate:      document.getElementById('in-issue').value,
+    dueDate:        document.getElementById('in-due').value,
+    notes:          document.getElementById('in-notes').value.trim(),
     items,
-    total:       items.reduce((s, i) => s + i.amount, 0).toFixed(2),
-    status:      'pending',
-    createdAt:   new Date().toISOString()
+    subtotal:       subtotal.toFixed(2),
+    vatAmount:      vatAmt.toFixed(2),
+    vatRate:        vatPct,
+    ritenuteAmount: ritenuta.toFixed(2),
+    taxName:        c.taxName,
+    total:          total.toFixed(2),
+    status:         'pending',
+    createdAt:      new Date().toISOString()
   };
 
   try {
@@ -1311,11 +1662,29 @@ async function loadClientView(token) {
     // We also need the freelancer's settings — but anon can't read settings.
     // We'll show what's available on the invoice itself.
     document.getElementById('cv-id').textContent    = inv.id;
-    document.getElementById('cv-from').textContent  = 'Freelancer'; // name not public
+    document.getElementById('cv-from').textContent  = 'Freelancer';
     document.getElementById('cv-from-vat').textContent = '';
     document.getElementById('cv-to').textContent    = inv.client;
     document.getElementById('cv-email').textContent = inv.clientEmail || '';
     document.getElementById('cv-total').textContent = fmt(inv.total);
+
+    // Tax breakdown
+    const hasBreakdown = inv.vatAmount > 0 || inv.ritenuteAmount > 0;
+    const breakdownEl = document.getElementById('cv-tax-breakdown');
+    if (breakdownEl) {
+      breakdownEl.classList.toggle('hidden', !hasBreakdown);
+      document.getElementById('cv-subtotal').textContent = fmt(inv.subtotal || inv.total);
+      const vatRow = document.getElementById('cv-vat-row');
+      const vatLbl = document.getElementById('cv-vat-label');
+      const vatAmt = document.getElementById('cv-vat-amt');
+      if (vatRow) vatRow.classList.toggle('hidden', !inv.vatAmount);
+      if (vatLbl) vatLbl.textContent = `${inv.taxName || 'VAT'} ${inv.vatRate}%`;
+      if (vatAmt) vatAmt.textContent = fmt(inv.vatAmount);
+      const ritRow = document.getElementById('cv-ritenuta-row');
+      const ritAmt = document.getElementById('cv-ritenuta-amt');
+      if (ritRow) ritRow.classList.toggle('hidden', !inv.ritenuteAmount);
+      if (ritAmt) ritAmt.textContent = `- ${fmt(inv.ritenuteAmount)}`;
+    }
 
     document.getElementById('cv-items').innerHTML = inv.items.map(it => `
       <div class="flex justify-between items-center py-2.5 border-b border-gray-100 text-sm last:border-0">
@@ -1539,15 +1908,34 @@ function renderAnalytics() {
 
 // ── SETTINGS ──────────────────────────────────────────────────────────
 function loadSetForm() {
-  document.getElementById('s-name').value  = S.settings.name        || '';
-  document.getElementById('s-email').value = S.settings.email       || '';
-  document.getElementById('s-vat').value   = S.settings.vat         || '';
-  document.getElementById('s-addr').value  = S.settings.address     || '';
-  document.getElementById('s-rate').value  = S.settings.defaultRate || 50;
-  document.getElementById('s-tax').value   = S.settings.taxRate     || 15;
-  document.getElementById('s-cur').value   = S.settings.currency    || 'EUR';
-  document.getElementById('s-terms').value = S.settings.terms       || '';
-  document.getElementById('s-days').value  = S.settings.dueDays     || 30;
+  document.getElementById('s-country').value  = S.settings.country     || 'IT';
+  document.getElementById('s-name').value     = S.settings.name        || '';
+  document.getElementById('s-email').value    = S.settings.email       || '';
+  document.getElementById('s-vat').value      = S.settings.vat         || '';
+  document.getElementById('s-vat2').value     = S.settings.vat2        || '';
+  document.getElementById('s-addr').value     = S.settings.address     || '';
+  document.getElementById('s-iban').value     = S.settings.iban        || '';
+  document.getElementById('s-rate').value     = S.settings.defaultRate || 50;
+  document.getElementById('s-tax').value      = S.settings.taxRate     || 15;
+  document.getElementById('s-cur').value      = S.settings.currency    || 'EUR';
+  document.getElementById('s-vat-rate').value = S.settings.vatOnInvoice ?? 22;
+  document.getElementById('s-terms').value    = S.settings.terms       || '';
+  document.getElementById('s-days').value     = S.settings.dueDays     || 30;
+  // Regime toggle states
+  ['ritenuta','kleinunternehmer','autoentrepreneur'].forEach(key => {
+    const btn  = document.getElementById(`toggle-${key}`);
+    const knob = document.getElementById(`toggle-${key}-knob`);
+    if (!btn) return;
+    if (S.settings[key]) {
+      btn.classList.replace('bg-gray-800','bg-accent');
+      if (knob) { knob.classList.replace('bg-gray-600','bg-black'); knob.classList.remove('left-1'); knob.classList.add('right-1'); }
+    } else {
+      btn.classList.replace('bg-accent','bg-gray-800');
+      if (knob) { knob.classList.replace('bg-black','bg-gray-600'); knob.classList.remove('right-1'); knob.classList.add('left-1'); }
+    }
+  });
+  syncVatToggleUI();
+  onCountryChange();
 }
 
 async function saveSettings() {
@@ -1556,31 +1944,47 @@ async function saveSettings() {
   btn.textContent = '...';
 
   S.settings = {
-    name:        document.getElementById('s-name').value.trim(),
-    email:       document.getElementById('s-email').value.trim(),
-    vat:         document.getElementById('s-vat').value.trim(),
-    address:     document.getElementById('s-addr').value.trim(),
-    defaultRate: parseFloat(document.getElementById('s-rate').value) || 50,
-    taxRate:     parseFloat(document.getElementById('s-tax').value)  || 15,
-    currency:    document.getElementById('s-cur').value,
-    terms:       document.getElementById('s-terms').value.trim(),
-    dueDays:     parseInt(document.getElementById('s-days').value)   || 30,
+    country:          document.getElementById('s-country').value || 'IT',
+    name:             document.getElementById('s-name').value.trim(),
+    email:            document.getElementById('s-email').value.trim(),
+    vat:              document.getElementById('s-vat').value.trim(),
+    vat2:             document.getElementById('s-vat2').value.trim(),
+    address:          document.getElementById('s-addr').value.trim(),
+    iban:             document.getElementById('s-iban').value.trim(),
+    defaultRate:      parseFloat(document.getElementById('s-rate').value) || 50,
+    taxRate:          parseFloat(document.getElementById('s-tax').value)  || 15,
+    currency:         document.getElementById('s-cur').value,
+    vatOnInvoice:     parseFloat(document.getElementById('s-vat-rate').value) ?? 22,
+    vatEnabled:       S.settings.vatEnabled,
+    ritenuta:         S.settings.ritenuta,
+    kleinunternehmer: S.settings.kleinunternehmer,
+    autoentrepreneur: S.settings.autoentrepreneur,
+    terms:            document.getElementById('s-terms').value.trim(),
+    dueDays:          parseInt(document.getElementById('s-days').value)   || 30,
   };
 
   try {
     const { error } = await _sb.from('settings').upsert({
-      user_id:      USER.id,
-      name:         S.settings.name,
-      email:        S.settings.email,
-      vat:          S.settings.vat,
-      address:      S.settings.address,
-      default_rate: S.settings.defaultRate,
-      tax_rate:     S.settings.taxRate,
-      currency:     S.settings.currency,
-      terms:        S.settings.terms,
-      due_days:     S.settings.dueDays,
-      lang:         S.lang,
-      updated_at:   new Date().toISOString()
+      user_id:          USER.id,
+      country:          S.settings.country,
+      name:             S.settings.name,
+      email:            S.settings.email,
+      vat:              S.settings.vat,
+      vat2:             S.settings.vat2,
+      address:          S.settings.address,
+      iban:             S.settings.iban,
+      default_rate:     S.settings.defaultRate,
+      tax_rate:         S.settings.taxRate,
+      currency:         S.settings.currency,
+      vat_on_invoice:   S.settings.vatOnInvoice,
+      vat_enabled:      S.settings.vatEnabled,
+      ritenuta:         S.settings.ritenuta,
+      kleinunternehmer: S.settings.kleinunternehmer,
+      autoentrepreneur: S.settings.autoentrepreneur,
+      terms:            S.settings.terms,
+      due_days:         S.settings.dueDays,
+      lang:             S.lang,
+      updated_at:       new Date().toISOString()
     });
     if (error) throw error;
     toast('✅', t('t_saved'));
@@ -1625,6 +2029,9 @@ function exportPDF(id) {
   doc.setFontSize(13); doc.setFont('helvetica','bold');
   doc.setTextColor(255,255,255); doc.text(inv.id, W-M, y+15, {align:'right'});
 
+  const code = S.settings.country || 'IT';
+  const ctry = COUNTRIES[code] || COUNTRIES.IT;
+
   y = 54;
   doc.setFontSize(7.5); doc.setFont('helvetica','bold'); doc.setTextColor(140,140,140);
   doc.text(t('pdf_from'), M, y); doc.text(t('pdf_to'), 112, y);
@@ -1634,10 +2041,24 @@ function exportPDF(id) {
   doc.text(inv.client, 112, y);
   y += 5;
   doc.setFontSize(8.5); doc.setFont('helvetica','normal'); doc.setTextColor(90,90,90);
-  if (S.settings.vat)      doc.text(`${t('pdf_vat')}: ${S.settings.vat}`, M, y);
+  const id1Lbl = ctry.id1[S.lang] || ctry.id1.en;
+  if (S.settings.vat)  doc.text(`${id1Lbl}: ${S.settings.vat}`, M, y);
+  if (S.settings.vat2) { y += 4; const id2Lbl = ctry.id2[S.lang] || ctry.id2.en; doc.text(`${id2Lbl}: ${S.settings.vat2}`, M, y); }
   if (S.settings.address) { y += 4; doc.text(S.settings.address, M, y); }
-  if (inv.clientEmail)     doc.text(inv.clientEmail, 112, y-4);
+  if (inv.clientEmail) doc.text(inv.clientEmail, 112, y-4);
+  if (S.settings.iban) { y += 4; doc.text(`${t('pdf_iban')}: ${S.settings.iban}`, M, y); }
   y += 13;
+
+  // Legal notice for special regimes
+  let legalNotice = '';
+  if (S.settings.kleinunternehmer) legalNotice = 'Gemäß §19 UStG wird keine Umsatzsteuer berechnet.';
+  if (S.settings.autoentrepreneur) legalNotice = 'TVA non applicable, art. 293 B du CGI.';
+  if (S.settings.ritenuta)         legalNotice = (legalNotice ? legalNotice + ' ' : '') + 'Soggetto a ritenuta d\'acconto del 20%.';
+  if (legalNotice) {
+    doc.setFontSize(7.5); doc.setFont('helvetica','bolditalic'); doc.setTextColor(120,120,120);
+    doc.text(doc.splitTextToSize(legalNotice, W-2*M), M, y);
+    y += 6;
+  }
 
   doc.setFontSize(7.5); doc.setFont('helvetica','bold'); doc.setTextColor(140,140,140);
   doc.text(`${t('pdf_date')}: ${inv.issueDate||'-'}`, M, y);
@@ -1664,6 +2085,34 @@ function exportPDF(id) {
     y += 9;
   });
   y += 3;
+
+  // Subtotal / VAT / Ritenuta breakdown
+  const hasBreakdown = inv.vatAmount > 0 || inv.ritenuteAmount > 0;
+  if (hasBreakdown) {
+    doc.setFillColor(248,248,248);
+    doc.rect(M, y-2, W-2*M, 8, 'F');
+    doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(80,80,80);
+    doc.text(t('pdf_subtotal'), M+4, y+3);
+    doc.text(`${sym()} ${parseFloat(inv.subtotal||inv.total).toFixed(2)}`, W-M-3, y+3, {align:'right'});
+    y += 8;
+    if (parseFloat(inv.vatAmount) > 0) {
+      doc.setFillColor(252,252,252);
+      doc.rect(M, y-2, W-2*M, 8, 'F');
+      doc.text(`${t('pdf_vat_amt')} (${inv.taxName||ctry.taxName} ${inv.vatRate}%)`, M+4, y+3);
+      doc.text(`${sym()} ${parseFloat(inv.vatAmount).toFixed(2)}`, W-M-3, y+3, {align:'right'});
+      y += 8;
+    }
+    if (parseFloat(inv.ritenuteAmount) > 0) {
+      doc.setFillColor(255,248,248);
+      doc.rect(M, y-2, W-2*M, 8, 'F');
+      doc.setTextColor(180,60,60);
+      doc.text(t('pdf_ritenuta') + ' (20%)', M+4, y+3);
+      doc.text(`- ${sym()} ${parseFloat(inv.ritenuteAmount).toFixed(2)}`, W-M-3, y+3, {align:'right'});
+      doc.setTextColor(80,80,80);
+      y += 8;
+    }
+    y += 2;
+  }
 
   doc.setFillColor(10,10,10);
   doc.rect(M, y-2, W-2*M, 12, 'F');
