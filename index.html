@@ -23,6 +23,8 @@
         * { -webkit-font-smoothing: antialiased; }
         body { background-color: #0a0a0a; color: white; }
         .hidden-view { display: none !important; }
+        /* Ensure Tailwind's .hidden always wins over .flex/.flex-col etc. */
+        .hidden { display: none !important; }
 
         .neon   { border: 1px solid rgba(255,204,0,0.2); box-shadow: 0 0 25px rgba(255,204,0,0.06); }
         .neon-s { border: 1px solid rgba(255,204,0,0.45); box-shadow: 0 0 30px rgba(255,204,0,0.18); }
@@ -1130,13 +1132,11 @@ function toggleVatEnabled() {
   const row  = document.getElementById('vat-rate-row');
   if (S.settings.vatEnabled) {
     btn.classList.replace('bg-gray-800','bg-accent');
-    knob.style.transform = 'translateX(0)';
     knob.classList.replace('bg-gray-600','bg-black');
     knob.classList.remove('left-1'); knob.classList.add('right-1');
     if (row) row.classList.remove('hidden');
   } else {
     btn.classList.replace('bg-accent','bg-gray-800');
-    knob.style.transform = 'translateX(0)';
     knob.classList.replace('bg-black','bg-gray-600');
     knob.classList.remove('right-1'); knob.classList.add('left-1');
     if (row) row.classList.add('hidden');
