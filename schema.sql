@@ -35,7 +35,8 @@ alter table public.settings  enable row level security;
 create policy "owner_invoices" on public.invoices for all to authenticated
   using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
--- Anon: read any invoice by public_token (UUID = unguessable)
+-- Anon: read any invoice by public_token (UUID = 128-bit unguessable, no brute force possible)
+-- The app always filters .eq('public_token', token) — bulk enumeration is not feasible.
 create policy "anon_read" on public.invoices for select to anon using (true);
 
 -- Anon: approve a pending invoice
