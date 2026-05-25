@@ -1029,9 +1029,13 @@ function fmtDate(d) {
 }
 
 function newId() {
-  const yr  = new Date().getFullYear();
-  const cnt = S.invoices.filter(i => i.id && i.id.includes(String(yr))).length + 1;
-  return `INV-${yr}-${String(cnt).padStart(3,'0')}`;
+  const yr     = new Date().getFullYear();
+  const prefix = `INV-${yr}-`;
+  const nums   = S.invoices
+    .filter(i => i.id && i.id.startsWith(prefix))
+    .map(i => parseInt(i.id.slice(prefix.length)) || 0);
+  const next = nums.length ? Math.max(...nums) + 1 : 1;
+  return `${prefix}${String(next).padStart(3,'0')}`;
 }
 
 // ── TOAST ─────────────────────────────────────────────────────────────
