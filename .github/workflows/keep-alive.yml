@@ -1,0 +1,17 @@
+name: Keep Supabase Alive
+
+on:
+  schedule:
+    - cron: '0 8 * * *'  # Every day at 8:00 UTC
+  workflow_dispatch:      # Allow manual trigger
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Supabase
+        run: |
+          curl -s -o /dev/null -w "%{http_code}" \
+            "https://vkxtdaalzznmwcfuxuyp.supabase.co/rest/v1/invoices?select=id&limit=1" \
+            -H "apikey: sb_publishable_66gbkXwBu2gMHR-JfQ9gDQ_NTekCZqi" \
+            -H "Authorization: Bearer sb_publishable_66gbkXwBu2gMHR-JfQ9gDQ_NTekCZqi"
