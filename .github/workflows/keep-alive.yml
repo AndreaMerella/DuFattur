@@ -9,9 +9,20 @@ jobs:
   ping:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping Supabase
+      - name: Ping Supabase REST
         run: |
-          curl -s -o /dev/null -w "%{http_code}" \
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
             "https://vkxtdaalzznmwcfuxuyp.supabase.co/rest/v1/invoices?select=id&limit=1" \
             -H "apikey: sb_publishable_66gbkXwBu2gMHR-JfQ9gDQ_NTekCZqi" \
-            -H "Authorization: Bearer sb_publishable_66gbkXwBu2gMHR-JfQ9gDQ_NTekCZqi"
+            -H "Authorization: Bearer sb_publishable_66gbkXwBu2gMHR-JfQ9gDQ_NTekCZqi")
+          echo "REST status: $STATUS"
+
+      - name: Ping Supabase Auth
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            "https://vkxtdaalzznmwcfuxuyp.supabase.co/auth/v1/health" \
+            -H "apikey: sb_publishable_66gbkXwBu2gMHR-JfQ9gDQ_NTekCZqi")
+          echo "Auth health status: $STATUS"
+          if [ "$STATUS" != "200" ]; then
+            echo "Warning: Auth health returned $STATUS"
+          fi
