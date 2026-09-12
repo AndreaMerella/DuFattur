@@ -397,9 +397,14 @@ create policy "owner_settings" on public.settings for all to authenticated
                 <h1 class="text-3xl font-black" data-i18n="dash_h1">Dashboard Operativa</h1>
                 <p class="text-gray-500 mt-1 text-sm" data-i18n="dash_sub">Monitora ore, incassi e stato dei proforma.</p>
             </div>
-            <button onclick="showView('invoice')" class="btn-y hidden md:flex items-center gap-2 flex-shrink-0">
-                <span>＋</span><span data-i18n="btn_new">Nuovo Proforma</span>
-            </button>
+            <div class="flex gap-2 flex-shrink-0">
+                <button onclick="exportCSV()" class="btn-o hidden md:flex items-center gap-2" title="Export all invoices as CSV">
+                    <span>📊</span><span data-i18n="btn_csv">CSV</span>
+                </button>
+                <button onclick="showView('invoice')" class="btn-y hidden md:flex items-center gap-2">
+                    <span>＋</span><span data-i18n="btn_new">Nuovo Proforma</span>
+                </button>
+            </div>
         </header>
 
         <!-- KPI row -->
@@ -916,7 +921,8 @@ const L = {
     btn_clear:'Cancella Tutti i Dati', btn_save:'SALVA IMPOSTAZIONI', btn_logout:'Logout',
     ph_item:'Descrizione servizio',
     s_pending:'In attesa', s_approved:'Approvato', s_paid:'Pagato', s_overdue:'Scaduto',
-    act_preview:'Anteprima', act_paid:'Segna Pagato', act_del:'Elimina',
+    act_preview:'Anteprima', act_paid:'Segna Pagato', act_del:'Elimina', act_repeat:'Ripeti', act_remind:'Sollecita',
+    btn_csv:'CSV',
     t_approved:'Proforma approvato!', t_paid:'Segnato come pagato!',
     t_saved:'Impostazioni salvate!', t_del:'Proforma eliminato.', t_cleared:'Dati eliminati.',
     t_pdf:'PDF esportato!', t_warn:'Aggiungi almeno una voce!', t_copied:'Link copiato!',
@@ -979,7 +985,8 @@ const L = {
     btn_clear:'Clear All Data', btn_save:'SAVE SETTINGS', btn_logout:'Logout',
     ph_item:'Service description',
     s_pending:'Pending', s_approved:'Approved', s_paid:'Paid', s_overdue:'Overdue',
-    act_preview:'Preview', act_paid:'Mark Paid', act_del:'Delete',
+    act_preview:'Preview', act_paid:'Mark Paid', act_del:'Delete', act_repeat:'Repeat', act_remind:'Remind',
+    btn_csv:'CSV',
     t_approved:'Invoice approved!', t_paid:'Marked as paid!',
     t_saved:'Settings saved!', t_del:'Invoice deleted.', t_cleared:'All data cleared.',
     t_pdf:'PDF exported!', t_warn:'Add at least one line item!', t_copied:'Link copied!',
@@ -1042,7 +1049,8 @@ const L = {
     btn_clear:'Alle Gegevens Wissen', btn_save:'INSTELLINGEN OPSLAAN', btn_logout:'Uitloggen',
     ph_item:'Serviceomschrijving',
     s_pending:'In behandeling', s_approved:'Goedgekeurd', s_paid:'Betaald', s_overdue:'Verlopen',
-    act_preview:'Voorbeeld', act_paid:'Markeer als Betaald', act_del:'Verwijderen',
+    act_preview:'Voorbeeld', act_paid:'Markeer als Betaald', act_del:'Verwijderen', act_repeat:'Herhalen', act_remind:'Herinnering',
+    btn_csv:'CSV',
     t_approved:'Factuur goedgekeurd!', t_paid:'Gemarkeerd als betaald!',
     t_saved:'Instellingen opgeslagen!', t_del:'Factuur verwijderd.', t_cleared:'Alle gegevens gewist.',
     t_pdf:'PDF geëxporteerd!', t_warn:'Voeg minimaal één regelitem toe!', t_copied:'Link gekopieerd!',
@@ -1105,7 +1113,8 @@ const L = {
     btn_clear:'Alle Daten Löschen', btn_save:'EINSTELLUNGEN SPEICHERN', btn_logout:'Abmelden',
     ph_item:'Leistungsbeschreibung',
     s_pending:'Ausstehend', s_approved:'Genehmigt', s_paid:'Bezahlt', s_overdue:'Überfällig',
-    act_preview:'Vorschau', act_paid:'Als Bezahlt Markieren', act_del:'Löschen',
+    act_preview:'Vorschau', act_paid:'Als Bezahlt Markieren', act_del:'Löschen', act_repeat:'Wiederholen', act_remind:'Mahnung',
+    btn_csv:'CSV',
     t_approved:'Rechnung genehmigt!', t_paid:'Als bezahlt markiert!',
     t_saved:'Einstellungen gespeichert!', t_del:'Rechnung gelöscht.', t_cleared:'Alle Daten gelöscht.',
     t_pdf:'PDF exportiert!', t_warn:'Mindestens eine Position hinzufügen!', t_copied:'Link kopiert!',
@@ -2094,6 +2103,8 @@ function renderDash() {
       <div class="flex flex-wrap gap-2 mt-4 pt-3 border-t border-gray-900">
         ${clientUrl ? `<button onclick="navigator.clipboard.writeText('${clientUrl}').then(()=>toast('📋','${t('t_copied')}'))" class="btn-o text-[11px] py-2 px-3">${t('act_preview')}</button>` : ''}
         ${st !== 'paid' ? `<button onclick="markPaid('${safeId}')" class="btn-o text-[11px] py-2 px-3 text-indigo-400 border-indigo-900 hover:border-indigo-600">${t('act_paid')}</button>` : ''}
+        <button onclick="duplicateInv('${safeId}')" class="btn-o text-[11px] py-2 px-3" title="${t('act_repeat')}">🔁 ${t('act_repeat')}</button>
+        ${st === 'overdue' ? `<button onclick="remindInvoice('${safeId}')" class="btn-o text-[11px] py-2 px-3 text-yellow-400 border-yellow-900 hover:border-yellow-600">⏰ ${t('act_remind')}</button>` : ''}
         <button onclick="exportPDF('${safeId}')" class="btn-o text-[11px] py-2 px-3">📄 PDF</button>
         <button onclick="exportUBL('${safeId}')" class="btn-o text-[11px] py-2 px-3" title="UBL 2.1 e-invoice">📑 UBL</button>
         <button onclick="emailInvoice('${safeId}')" class="btn-o text-[11px] py-2 px-3">✉️ Email</button>
@@ -2534,6 +2545,105 @@ ${lines}
   document.body.appendChild(a); a.click();
   document.body.removeChild(a); URL.revokeObjectURL(url);
   toast('📑', t('t_ubl'));
+}
+
+// ── DUPLICATE INVOICE ─────────────────────────────────────────────────
+function duplicateInv(id) {
+  const inv = S.invoices.find(i => i.id === id);
+  if (!inv) return;
+  showView('invoice');
+  // Wait for view to render, then fill form
+  setTimeout(() => {
+    resetInvForm();
+    document.getElementById('in-client').value = inv.client || '';
+    document.getElementById('in-cemail').value = inv.clientEmail || '';
+    // Rebuild line items
+    document.getElementById('items-box').innerHTML = '';
+    itemIdx = 0;
+    (inv.items || []).forEach(it => addItem(it.desc, it.hours, it.rate));
+    if (!inv.items || !inv.items.length) addItem();
+    document.getElementById('in-notes').value = inv.notes || S.settings.terms || '';
+    recalc();
+    toast('🔁', t('act_repeat') + '!');
+  }, 50);
+}
+
+// ── OVERDUE PAYMENT REMINDER ───────────────────────────────────────────
+function remindInvoice(id) {
+  const inv = S.invoices.find(i => i.id === id);
+  if (!inv) return;
+
+  const sender = S.settings.name || S.settings.email || 'DuFattur';
+  const amount = fmt(inv.total);
+  const due    = inv.dueDate ? fmtDate(inv.dueDate) : '';
+  const link   = inv.id ? `${location.origin}${location.pathname}?inv=${inv.id}` : '';
+  const iban   = S.settings.iban || '';
+  const client = inv.client || '';
+
+  const templates = {
+    it: {
+      subj: `Sollecito di pagamento — ${inv.id}`,
+      body: `Gentile ${client},\n\nTi scrivo per ricordarti che la proforma n. ${inv.id} di ${amount}${due ? ` (scaduta il ${due})` : ''} risulta ancora non saldata.\n\nPuoi consultarla qui:\n${link}${iban ? `\n\nCoordinate bancarie: IBAN ${iban}` : ''}\n\nGrazie per la collaborazione,\n${sender}`,
+    },
+    en: {
+      subj: `Payment reminder — ${inv.id}`,
+      body: `Hi ${client},\n\nThis is a friendly reminder that invoice ${inv.id} for ${amount}${due ? ` (due ${due})` : ''} is still outstanding.\n\nYou can view it here:\n${link}${iban ? `\n\nPayment details: IBAN ${iban}` : ''}\n\nThank you,\n${sender}`,
+    },
+    nl: {
+      subj: `Betalingsherinnering — ${inv.id}`,
+      body: `Beste ${client},\n\nWij willen u er vriendelijk aan herinneren dat factuur ${inv.id} van ${amount}${due ? ` (vervallen op ${due})` : ''} nog niet is betaald.\n\nU kunt de factuur hier bekijken:\n${link}${iban ? `\n\nBetaalgegevens: IBAN ${iban}` : ''}\n\nMet vriendelijke groet,\n${sender}`,
+    },
+    de: {
+      subj: `Zahlungserinnerung — ${inv.id}`,
+      body: `Sehr geehrte Damen und Herren,\n\nhiermit möchten wir Sie freundlich daran erinnern, dass Rechnung ${inv.id} über ${amount}${due ? ` (fällig am ${due})` : ''} noch offen ist.\n\nSie können die Rechnung hier einsehen:\n${link}${iban ? `\n\nBankverbindung: IBAN ${iban}` : ''}\n\nMit freundlichen Grüßen,\n${sender}`,
+    },
+  };
+
+  const tpl = templates[S.lang] || templates.en;
+  _emailInvId = id;
+  _emailBody  = tpl.body;
+  _emailSubj  = tpl.subj;
+  _emailTo    = inv.clientEmail || '';
+
+  document.getElementById('em-title').textContent    = '⏰ ' + t('act_remind');
+  document.getElementById('em-to-lbl').textContent   = t('em_to');
+  document.getElementById('em-subj-lbl').textContent = t('em_subj_lbl');
+  document.getElementById('em-body-lbl').textContent = t('em_body_lbl');
+  document.getElementById('em-open-lbl').textContent = t('em_open');
+  document.getElementById('em-copy-lbl').textContent = t('em_copy');
+  document.getElementById('em-to').textContent       = _emailTo || '—';
+  document.getElementById('em-subject').textContent  = _emailSubj;
+  document.getElementById('em-body').textContent     = _emailBody;
+  document.getElementById('email-modal').classList.remove('hidden');
+}
+
+// ── CSV EXPORT ────────────────────────────────────────────────────────
+function exportCSV() {
+  if (!S.invoices.length) { toast('⚠️', t('empty')); return; }
+  const cols = ['ID', 'Client', 'Email', 'Issue Date', 'Due Date', 'Status', 'Subtotal', 'VAT', 'Total', 'Currency', 'Notes'];
+  const rows = S.invoices.map(inv => [
+    inv.id,
+    inv.client,
+    inv.clientEmail || '',
+    inv.issueDate || '',
+    inv.dueDate || '',
+    getStatus(inv),
+    parseFloat(inv.subtotal || inv.total || 0).toFixed(2),
+    parseFloat(inv.vatAmount || 0).toFixed(2),
+    parseFloat(inv.total || 0).toFixed(2),
+    S.settings.currency || 'EUR',
+    (inv.notes || '').replace(/\n/g, ' '),
+  ].map(v => `"${String(v).replace(/"/g, '""')}"`));
+
+  const csv  = [cols.join(','), ...rows.map(r => r.join(','))].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  const date = new Date().toISOString().split('T')[0];
+  a.href = url; a.download = `dufattur-${date}.csv`;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a); URL.revokeObjectURL(url);
+  toast('📊', `CSV — ${S.invoices.length} ${S.invoices.length === 1 ? 'invoice' : 'invoices'}`);
 }
 
 // ── SAVED CLIENTS AUTOCOMPLETE ────────────────────────────────────────
