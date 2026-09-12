@@ -201,6 +201,34 @@
         <span id="toast-msg">Done!</span>
     </div>
 
+    <!-- ══════════ EMAIL MODAL ══════════ -->
+    <div id="email-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4" style="background:rgba(0,0,0,0.85);">
+        <div class="w-full max-w-lg bg-panel rounded-2xl border border-gray-800 overflow-hidden shadow-2xl">
+            <div class="px-6 py-5 border-b border-gray-800 flex items-center justify-between">
+                <div class="font-black text-white">✉️ <span id="em-title">Send Invoice</span></div>
+                <button onclick="document.getElementById('email-modal').classList.add('hidden')" class="text-gray-600 hover:text-white text-xl font-bold leading-none">×</button>
+            </div>
+            <div class="px-6 py-5 space-y-4">
+                <div>
+                    <div class="text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-1" id="em-to-lbl">To</div>
+                    <div class="text-sm font-bold text-accent" id="em-to">—</div>
+                </div>
+                <div>
+                    <div class="text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-1" id="em-subj-lbl">Subject</div>
+                    <div class="text-sm font-bold text-white" id="em-subject">—</div>
+                </div>
+                <div>
+                    <div class="text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-2" id="em-body-lbl">Message</div>
+                    <div id="em-body" class="text-sm text-gray-300 bg-black rounded-xl px-4 py-4 whitespace-pre-wrap leading-relaxed font-mono" style="max-height:260px;overflow-y:auto;font-size:0.78rem;"></div>
+                </div>
+            </div>
+            <div class="px-6 pb-6 flex gap-3">
+                <button onclick="emailModalOpen()" class="btn-y flex-1">✉️ <span id="em-open-lbl">Open in Email Client</span></button>
+                <button onclick="emailModalCopy()" class="btn-o flex-1"><span id="em-copy-lbl">Copy Body</span></button>
+            </div>
+        </div>
+    </div>
+
     <!-- ══════════ SETUP ══════════ -->
     <div id="view-setup" class="hidden-view min-h-screen flex items-center justify-center p-6">
         <div class="w-full max-w-lg">
@@ -552,6 +580,9 @@ create policy "owner_settings" on public.settings for all to authenticated
                     <button onclick="exportUBL(window._lid)" class="btn-o flex-1 flex items-center justify-center gap-2" title="UBL 2.1 e-invoice (EU standard)">
                         <span>📑</span><span>UBL XML</span>
                     </button>
+                    <button onclick="emailInvoice(window._lid)" class="btn-o w-full flex items-center justify-center gap-2">
+                        <span>✉️</span><span data-i18n="btn_email">Invia per Email</span>
+                    </button>
                     <button onclick="resetInvForm()" class="btn-y w-full" data-i18n="btn_another">＋ Nuovo</button>
                 </div>
             </div>
@@ -887,7 +918,10 @@ const L = {
     t_approved:'Proforma approvato!', t_paid:'Segnato come pagato!',
     t_saved:'Impostazioni salvate!', t_del:'Proforma eliminato.', t_cleared:'Dati eliminati.',
     t_pdf:'PDF esportato!', t_warn:'Aggiungi almeno una voce!', t_copied:'Link copiato!',
-    t_ubl:'UBL esportato!',
+    t_ubl:'UBL esportato!', t_email_copied:'Testo copiato!',
+    btn_email:'Invia per Email',
+    em_title:'Invia Proforma', em_to:'A', em_subj_lbl:'Oggetto', em_body_lbl:'Messaggio',
+    em_open:'Apri nel client email', em_copy:'Copia testo',
     empty:'Nessun proforma trovato. Crea il primo!',
     c_del:'Eliminare questo proforma?', c_clear:'Sei SICURO? Verranno eliminati TUTTI i proforma.',
     due_lbl:'Scade il', issue_lbl:'Emesso il',
@@ -947,7 +981,10 @@ const L = {
     t_approved:'Invoice approved!', t_paid:'Marked as paid!',
     t_saved:'Settings saved!', t_del:'Invoice deleted.', t_cleared:'All data cleared.',
     t_pdf:'PDF exported!', t_warn:'Add at least one line item!', t_copied:'Link copied!',
-    t_ubl:'UBL exported!',
+    t_ubl:'UBL exported!', t_email_copied:'Text copied!',
+    btn_email:'Send by Email',
+    em_title:'Send Invoice', em_to:'To', em_subj_lbl:'Subject', em_body_lbl:'Message',
+    em_open:'Open in Email Client', em_copy:'Copy Body',
     empty:'No invoices found. Create your first one!',
     c_del:'Delete this invoice?', c_clear:'Are you SURE? This will delete ALL invoices.',
     due_lbl:'Due', issue_lbl:'Issued',
@@ -1007,7 +1044,10 @@ const L = {
     t_approved:'Factuur goedgekeurd!', t_paid:'Gemarkeerd als betaald!',
     t_saved:'Instellingen opgeslagen!', t_del:'Factuur verwijderd.', t_cleared:'Alle gegevens gewist.',
     t_pdf:'PDF geëxporteerd!', t_warn:'Voeg minimaal één regelitem toe!', t_copied:'Link gekopieerd!',
-    t_ubl:'UBL geëxporteerd!',
+    t_ubl:'UBL geëxporteerd!', t_email_copied:'Tekst gekopieerd!',
+    btn_email:'Verstuur per E-mail',
+    em_title:'Factuur Versturen', em_to:'Aan', em_subj_lbl:'Onderwerp', em_body_lbl:'Bericht',
+    em_open:'Openen in e-mailprogramma', em_copy:'Tekst Kopiëren',
     empty:'Geen facturen gevonden. Maak uw eerste!',
     c_del:'Deze factuur verwijderen?', c_clear:'Weet u het ZEKER? Dit verwijdert ALLE facturen.',
     due_lbl:'Vervaldatum', issue_lbl:'Uitgifte',
@@ -1067,7 +1107,10 @@ const L = {
     t_approved:'Rechnung genehmigt!', t_paid:'Als bezahlt markiert!',
     t_saved:'Einstellungen gespeichert!', t_del:'Rechnung gelöscht.', t_cleared:'Alle Daten gelöscht.',
     t_pdf:'PDF exportiert!', t_warn:'Mindestens eine Position hinzufügen!', t_copied:'Link kopiert!',
-    t_ubl:'UBL exportiert!',
+    t_ubl:'UBL exportiert!', t_email_copied:'Text kopiert!',
+    btn_email:'Per E-Mail Senden',
+    em_title:'Rechnung Senden', em_to:'An', em_subj_lbl:'Betreff', em_body_lbl:'Nachricht',
+    em_open:'Im E-Mail-Programm öffnen', em_copy:'Text Kopieren',
     empty:'Keine Rechnungen gefunden. Erste erstellen!',
     c_del:'Diese Rechnung löschen?', c_clear:'Sind Sie SICHER? Alle Rechnungen werden gelöscht.',
     due_lbl:'Fällig', issue_lbl:'Ausgestellt',
@@ -2051,6 +2094,7 @@ function renderDash() {
         ${st !== 'paid' ? `<button onclick="markPaid('${safeId}')" class="btn-o text-[11px] py-2 px-3 text-indigo-400 border-indigo-900 hover:border-indigo-600">${t('act_paid')}</button>` : ''}
         <button onclick="exportPDF('${safeId}')" class="btn-o text-[11px] py-2 px-3">📄 PDF</button>
         <button onclick="exportUBL('${safeId}')" class="btn-o text-[11px] py-2 px-3" title="UBL 2.1 e-invoice">📑 UBL</button>
+        <button onclick="emailInvoice('${safeId}')" class="btn-o text-[11px] py-2 px-3">✉️ Email</button>
         <button onclick="delInv('${safeId}')" class="btn-o text-[11px] py-2 px-3 text-red-400 border-red-900 hover:border-red-600 ml-auto">${t('act_del')}</button>
       </div>
     </div>`;
@@ -2488,6 +2532,72 @@ ${lines}
   document.body.appendChild(a); a.click();
   document.body.removeChild(a); URL.revokeObjectURL(url);
   toast('📑', t('t_ubl'));
+}
+
+// ── EMAIL INVOICE ─────────────────────────────────────────────────────
+let _emailInvId = null;
+let _emailBody  = '';
+let _emailSubj  = '';
+let _emailTo    = '';
+
+function emailInvoice(id) {
+  const inv = S.invoices.find(i => i.id === id);
+  if (!inv) return;
+
+  const sender  = S.settings.name || S.settings.email || 'DuFattur';
+  const amount  = fmt(inv.total);
+  const due     = inv.dueDate ? fmtDate(inv.dueDate) : '';
+  const link    = inv.id ? `${location.origin}${location.pathname}?inv=${inv.id}` : '';
+  const iban    = S.settings.iban || '';
+  const client  = inv.client || '';
+
+  const templates = {
+    it: {
+      subj: `Proforma ${inv.id} — ${amount}`,
+      body: `Gentile ${client},\n\nTi invio la proforma n. ${inv.id} per la tua revisione e approvazione.\n\nImporto: ${amount}${due ? `\nScadenza: ${due}` : ''}\n\nPuoi visualizzare e approvare online qui:\n${link}${iban ? `\n\nCoordinate bancarie: IBAN ${iban}` : ''}\n\nGrazie,\n${sender}`,
+    },
+    en: {
+      subj: `Invoice ${inv.id} — ${amount} due`,
+      body: `Hi ${client},\n\nPlease find invoice ${inv.id} for your review and approval.\n\nAmount due: ${amount}${due ? `\nDue date: ${due}` : ''}\n\nReview and approve it here:\n${link}${iban ? `\n\nPayment details: IBAN ${iban}` : ''}\n\nThank you,\n${sender}`,
+    },
+    nl: {
+      subj: `Factuur ${inv.id} — ${amount}`,
+      body: `Beste ${client},\n\nHierbij ontvangt u factuur ${inv.id} ter beoordeling en goedkeuring.\n\nBedrag: ${amount}${due ? `\nVervaldatum: ${due}` : ''}\n\nU kunt de factuur online bekijken en goedkeuren via:\n${link}${iban ? `\n\nBetaalgegevens: IBAN ${iban}` : ''}\n\nMet vriendelijke groet,\n${sender}`,
+    },
+    de: {
+      subj: `Rechnung ${inv.id} — ${amount}`,
+      body: `Sehr geehrte Damen und Herren,\n\nanbei übersende ich Ihnen Rechnung ${inv.id} zur Prüfung und Bestätigung.\n\nBetrag: ${amount}${due ? `\nFälligkeitsdatum: ${due}` : ''}\n\nSie können die Rechnung hier einsehen und bestätigen:\n${link}${iban ? `\n\nBankverbindung: IBAN ${iban}` : ''}\n\nMit freundlichen Grüßen,\n${sender}`,
+    },
+  };
+
+  const tpl = templates[S.lang] || templates.en;
+  _emailInvId = id;
+  _emailBody  = tpl.body;
+  _emailSubj  = tpl.subj;
+  _emailTo    = inv.clientEmail || '';
+
+  document.getElementById('em-title').textContent   = t('em_title');
+  document.getElementById('em-to-lbl').textContent  = t('em_to');
+  document.getElementById('em-subj-lbl').textContent= t('em_subj_lbl');
+  document.getElementById('em-body-lbl').textContent = t('em_body_lbl');
+  document.getElementById('em-open-lbl').textContent = t('em_open');
+  document.getElementById('em-copy-lbl').textContent = t('em_copy');
+  document.getElementById('em-to').textContent      = _emailTo || '—';
+  document.getElementById('em-subject').textContent = _emailSubj;
+  document.getElementById('em-body').textContent    = _emailBody;
+
+  document.getElementById('email-modal').classList.remove('hidden');
+}
+
+function emailModalOpen() {
+  const to   = encodeURIComponent(_emailTo);
+  const subj = encodeURIComponent(_emailSubj);
+  const body = encodeURIComponent(_emailBody);
+  window.location.href = `mailto:${to}?subject=${subj}&body=${body}`;
+}
+
+function emailModalCopy() {
+  navigator.clipboard.writeText(_emailBody).then(() => toast('📋', t('t_email_copied')));
 }
 
 // ── BOOT ──────────────────────────────────────────────────────────────
