@@ -315,18 +315,30 @@ create policy "owner_settings" on public.settings for all to authenticated
     <!-- ══════════ LOGIN ══════════ -->
     <div id="view-login" class="hidden-view min-h-screen flex items-center justify-center p-6">
         <div class="w-full max-w-sm">
-            <div class="text-center mb-10">
-                <div class="font-black text-[2rem] tracking-tighter mb-2">DU<span class="text-accent">FATTUR</span></div>
-                <div class="text-gray-500 text-sm">Sign in with your email — no password needed.</div>
+
+            <div class="text-center mb-8">
+                <div class="font-black text-[2.2rem] tracking-tighter mb-1">DU<span class="text-accent">FATTUR</span></div>
+                <div class="text-white font-bold text-base mb-1">Freelance invoicing. No fuss.</div>
+                <div class="text-gray-600 text-xs">Create professional invoices, track what clients owe you,<br>and automatically set money aside for tax season.</div>
+            </div>
+
+            <!-- feature pills -->
+            <div class="flex flex-wrap gap-2 justify-center mb-7">
+                <span style="background:#111;border:1px solid #222;border-radius:999px;padding:5px 13px;font-size:0.7rem;font-weight:700;color:#888;letter-spacing:0.03em;">📋 PDF Invoices</span>
+                <span style="background:#111;border:1px solid #222;border-radius:999px;padding:5px 13px;font-size:0.7rem;font-weight:700;color:#888;letter-spacing:0.03em;">⏱ Hour Tracker</span>
+                <span style="background:#111;border:1px solid #222;border-radius:999px;padding:5px 13px;font-size:0.7rem;font-weight:700;color:#888;letter-spacing:0.03em;">💰 Tax Vault</span>
+                <span style="background:#111;border:1px solid #222;border-radius:999px;padding:5px 13px;font-size:0.7rem;font-weight:700;color:#888;letter-spacing:0.03em;">🔗 Client Links</span>
+                <span style="background:#111;border:1px solid #222;border-radius:999px;padding:5px 13px;font-size:0.7rem;font-weight:700;color:#888;letter-spacing:0.03em;">📊 Revenue Dash</span>
             </div>
 
             <div class="card neon" style="background:#0e0e0e;border-color:#222;">
                 <div id="login-form-wrap">
                     <div class="mb-5">
-                        <label class="block text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-2">Email</label>
+                        <label class="block text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-2">Your email</label>
                         <input type="email" id="login-email" class="ifield" placeholder="you@email.com" onkeydown="if(event.key==='Enter')doLogin()">
                     </div>
                     <button id="btn-login" onclick="doLogin()" class="btn-y w-full">SEND MAGIC LINK</button>
+                    <div class="text-center text-gray-700 text-[10px] mt-3 font-medium">No password. No subscription. Free.</div>
                     <div id="login-err" class="hidden mt-3 text-red-400 text-xs text-center font-bold"></div>
                 </div>
                 <div id="login-sent" class="hidden text-center py-4">
