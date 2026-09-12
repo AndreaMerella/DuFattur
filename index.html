@@ -182,9 +182,11 @@
 
     <!-- Lang toggle -->
     <div class="px-1 mt-4">
-        <div class="flex bg-black rounded-xl p-1 border border-gray-900">
-            <button onclick="setLang('it')" id="lang-it" class="flex-1 py-2 rounded-lg text-xs font-black transition bg-accent text-black">🇮🇹 IT</button>
-            <button onclick="setLang('en')" id="lang-en" class="flex-1 py-2 rounded-lg text-xs font-black transition text-gray-600 hover:text-white">🇬🇧 EN</button>
+        <div class="grid grid-cols-2 gap-1 bg-black rounded-xl p-1 border border-gray-900">
+            <button onclick="setLang('it')" id="lang-it" class="py-1.5 rounded-lg text-[10px] font-black transition bg-accent text-black">🇮🇹 IT</button>
+            <button onclick="setLang('en')" id="lang-en" class="py-1.5 rounded-lg text-[10px] font-black transition text-gray-600 hover:text-white">🇬🇧 EN</button>
+            <button onclick="setLang('nl')" id="lang-nl" class="py-1.5 rounded-lg text-[10px] font-black transition text-gray-600 hover:text-white">🇳🇱 NL</button>
+            <button onclick="setLang('de')" id="lang-de" class="py-1.5 rounded-lg text-[10px] font-black transition text-gray-600 hover:text-white">🇩🇪 DE</button>
         </div>
     </div>
     <div class="px-3 mt-3 text-[10px] text-gray-700 font-bold">v3.0 · DuFattur</div>
@@ -315,18 +317,30 @@ create policy "owner_settings" on public.settings for all to authenticated
     <!-- ══════════ LOGIN ══════════ -->
     <div id="view-login" class="hidden-view min-h-screen flex items-center justify-center p-6">
         <div class="w-full max-w-sm">
-            <div class="text-center mb-10">
-                <div class="font-black text-[2rem] tracking-tighter mb-2">DU<span class="text-accent">FATTUR</span></div>
-                <div class="text-gray-500 text-sm">Sign in with your email — no password needed.</div>
+
+            <div class="text-center mb-8">
+                <div class="font-black text-[2.2rem] tracking-tighter mb-1">DU<span class="text-accent">FATTUR</span></div>
+                <div class="text-white font-bold text-base mb-1">Freelance invoicing. No fuss.</div>
+                <div class="text-gray-600 text-xs">Create professional invoices, track what clients owe you,<br>and automatically set money aside for tax season.</div>
+            </div>
+
+            <!-- feature pills -->
+            <div class="flex flex-wrap gap-2 justify-center mb-7">
+                <span style="background:#111;border:1px solid #222;border-radius:999px;padding:5px 13px;font-size:0.7rem;font-weight:700;color:#888;letter-spacing:0.03em;">📋 PDF Invoices</span>
+                <span style="background:#111;border:1px solid #222;border-radius:999px;padding:5px 13px;font-size:0.7rem;font-weight:700;color:#888;letter-spacing:0.03em;">⏱ Hour Tracker</span>
+                <span style="background:#111;border:1px solid #222;border-radius:999px;padding:5px 13px;font-size:0.7rem;font-weight:700;color:#888;letter-spacing:0.03em;">💰 Tax Vault</span>
+                <span style="background:#111;border:1px solid #222;border-radius:999px;padding:5px 13px;font-size:0.7rem;font-weight:700;color:#888;letter-spacing:0.03em;">🔗 Client Links</span>
+                <span style="background:#111;border:1px solid #222;border-radius:999px;padding:5px 13px;font-size:0.7rem;font-weight:700;color:#888;letter-spacing:0.03em;">📊 Revenue Dash</span>
             </div>
 
             <div class="card neon" style="background:#0e0e0e;border-color:#222;">
                 <div id="login-form-wrap">
                     <div class="mb-5">
-                        <label class="block text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-2">Email</label>
+                        <label class="block text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-2">Your email</label>
                         <input type="email" id="login-email" class="ifield" placeholder="you@email.com" onkeydown="if(event.key==='Enter')doLogin()">
                     </div>
                     <button id="btn-login" onclick="doLogin()" class="btn-y w-full">SEND MAGIC LINK</button>
+                    <div class="text-center text-gray-700 text-[10px] mt-3 font-medium">No password. No subscription. Free.</div>
                     <div id="login-err" class="hidden mt-3 text-red-400 text-xs text-center font-bold"></div>
                 </div>
                 <div id="login-sent" class="hidden text-center py-4">
@@ -531,11 +545,14 @@ create policy "owner_settings" on public.settings for all to authenticated
                     <span id="gen-link-txt">loading...</span> <span class="text-gray-600">↗</span>
                 </div>
 
-                <div class="flex gap-3 w-full">
+                <div class="flex gap-2 w-full flex-wrap">
                     <button onclick="exportPDF(window._lid)" class="btn-o flex-1 flex items-center justify-center gap-2">
                         <span>📄</span><span data-i18n="btn_pdf">Esporta PDF</span>
                     </button>
-                    <button onclick="resetInvForm()" class="btn-y flex-1" data-i18n="btn_another">＋ Nuovo</button>
+                    <button onclick="exportUBL(window._lid)" class="btn-o flex-1 flex items-center justify-center gap-2" title="UBL 2.1 e-invoice (EU standard)">
+                        <span>📑</span><span>UBL XML</span>
+                    </button>
+                    <button onclick="resetInvForm()" class="btn-y w-full" data-i18n="btn_another">＋ Nuovo</button>
                 </div>
             </div>
         </div>
@@ -794,9 +811,11 @@ create policy "owner_settings" on public.settings for all to authenticated
             <!-- Language inside settings -->
             <div class="card" style="background:#0e0e0e;border-color:#1e1e1e;">
                 <h3 class="text-[10px] font-black uppercase tracking-widest text-gray-500 mb-4" data-i18n="set_lang">Lingua / Language</h3>
-                <div class="flex bg-black rounded-xl p-1 border border-gray-900 max-w-[180px]">
-                    <button onclick="setLang('it')" id="lang-it" class="flex-1 py-2 rounded-lg text-xs font-black transition bg-accent text-black">🇮🇹 IT</button>
-                    <button onclick="setLang('en')" id="lang-en" class="flex-1 py-2 rounded-lg text-xs font-black transition text-gray-600 hover:text-white">🇬🇧 EN</button>
+                <div class="grid grid-cols-2 gap-1 bg-black rounded-xl p-1 border border-gray-900 max-w-[180px]">
+                    <button onclick="setLang('it')" id="lang-it" class="py-1.5 rounded-lg text-[10px] font-black transition bg-accent text-black">🇮🇹 IT</button>
+                    <button onclick="setLang('en')" id="lang-en" class="py-1.5 rounded-lg text-[10px] font-black transition text-gray-600 hover:text-white">🇬🇧 EN</button>
+                    <button onclick="setLang('nl')" id="lang-nl" class="py-1.5 rounded-lg text-[10px] font-black transition text-gray-600 hover:text-white">🇳🇱 NL</button>
+                    <button onclick="setLang('de')" id="lang-de" class="py-1.5 rounded-lg text-[10px] font-black transition text-gray-600 hover:text-white">🇩🇪 DE</button>
                 </div>
             </div>
 
@@ -868,6 +887,7 @@ const L = {
     t_approved:'Proforma approvato!', t_paid:'Segnato come pagato!',
     t_saved:'Impostazioni salvate!', t_del:'Proforma eliminato.', t_cleared:'Dati eliminati.',
     t_pdf:'PDF esportato!', t_warn:'Aggiungi almeno una voce!', t_copied:'Link copiato!',
+    t_ubl:'UBL esportato!',
     empty:'Nessun proforma trovato. Crea il primo!',
     c_del:'Eliminare questo proforma?', c_clear:'Sei SICURO? Verranno eliminati TUTTI i proforma.',
     due_lbl:'Scade il', issue_lbl:'Emesso il',
@@ -927,6 +947,7 @@ const L = {
     t_approved:'Invoice approved!', t_paid:'Marked as paid!',
     t_saved:'Settings saved!', t_del:'Invoice deleted.', t_cleared:'All data cleared.',
     t_pdf:'PDF exported!', t_warn:'Add at least one line item!', t_copied:'Link copied!',
+    t_ubl:'UBL exported!',
     empty:'No invoices found. Create your first one!',
     c_del:'Delete this invoice?', c_clear:'Are you SURE? This will delete ALL invoices.',
     due_lbl:'Due', issue_lbl:'Issued',
@@ -942,6 +963,126 @@ const L = {
     set_autoentrepreneur:'Auto-entrepreneur (TVA exempt)',
     lbl_subtotal:'Subtotal', lbl_vat_amt:'VAT', lbl_ritenuta:'Withholding (20%)',
     set_regime:'Special Tax Regime',
+  },
+  nl: {
+    nav_dash:'Dashboard', nav_inv:'Nieuwe Factuur', nav_an:'Analyse', nav_set:'Instellingen',
+    dash_h1:'Operationeel Dashboard', dash_sub:'Volg uren, omzet en factuurstatus.',
+    kpi_tot:'Totaal Facturen', kpi_pend:'In Behandeling', kpi_appr:'Openstaand', kpi_tax:'Belastingreserve',
+    timer_lbl:'Werksessie', timer_start:'START', timer_stop:'STOP', timer_rate:'Uurtarief (€/u)', timer_add_inv:'Voeg toe aan factuur',
+    qs_paid:'Verdiend (Betaald)', qs_ytd:'Jaar tot nu toe', qs_over:'Verlopen', qs_over_s:'achterstallige facturen',
+    list_h:'Factuuroverzicht', btn_new:'Nieuwe Factuur',
+    f_all:'Alle', f_pend:'In behandeling', f_appr:'Goedgekeurd', f_paid:'Betaald', f_over:'Verlopen',
+    inv_h1:'Nieuwe Factuur', inv_sub:'Vul de details in en stuur naar uw klant.',
+    sec_client:'Klantgegevens', sec_items:'Regelitems',
+    lbl_cname:'Klantnaam', lbl_cemail:'E-mail klant',
+    ph_cname:'bijv. ACME Corp',
+    lbl_total:'Totaal', btn_add_item:'+ Regelitem Toevoegen',
+    lbl_issue:'Factuurdatum', lbl_due:'Vervaldatum',
+    lbl_notes:'Notities / Betalingsvoorwaarden', ph_notes:'bijv. Betaling binnen 30 dagen na ontvangst...',
+    btn_gen:'LINK GENEREREN', btn_cancel:'Annuleren', btn_pdf:'PDF Exporteren', btn_another:'＋ Nieuwe Factuur',
+    succ_h:'Link Klaar!', succ_p:'Stuur deze link naar uw klant ter goedkeuring.',
+    lnk_lbl:'Klantlink (klik om te kopiëren)',
+    col_desc:'Omschrijving', col_h:'Uren', col_r:'Tarief',
+    cv_lbl:'Factuur', cv_from:'Van', cv_to:'Aan', cv_tot:'Totaal Te Betalen',
+    cv_approve:'GOEDKEUREN & BEVESTIGEN', cv_back:'← Terug naar App',
+    an_h1:'Financiële Analyse', an_sub:'Omzetoverzicht en maandelijkse trends.',
+    an_earned:'Totaal Verdiend', an_out:'Openstaand', an_avg:'Gem. Factuur',
+    an_chart:'Maandelijkse Omzet (laatste 12 maanden)', an_top:'Top Klanten',
+    set_h1:'Instellingen', set_sub:'Uw freelanceprofiel en app-voorkeuren.',
+    set_prof:'Freelanceprofiel', set_name:'Naam / Bedrijfsnaam', set_email:'E-mail',
+    set_vat:'BTW-nummer', set_addr:'Adres',
+    ph_sname:'Uw naam of bedrijf', ph_saddr:'Straatnaam 1, Amsterdam',
+    set_fin:'Financiële Voorkeuren', set_rate:'Standaard Uurtarief (€/u)',
+    set_tax:'% Belasting reserveren', set_cur:'Valuta',
+    set_terms_h:'Standaard Betalingsvoorwaarden',
+    set_terms_l:'Standaardnotities (vooraf ingevuld op elke factuur)',
+    ph_terms:'bijv. Betaling verschuldigd binnen 30 dagen na factuurdatum.',
+    set_days:'Standaard vervaldagen',
+    set_lang:'Taal',
+    set_danger:'Gevarenzone', set_danger_p:'Verwijdert alle facturen uit de database. Dit kan niet ongedaan worden gemaakt.',
+    btn_clear:'Alle Gegevens Wissen', btn_save:'INSTELLINGEN OPSLAAN', btn_logout:'Uitloggen',
+    ph_item:'Serviceomschrijving',
+    s_pending:'In behandeling', s_approved:'Goedgekeurd', s_paid:'Betaald', s_overdue:'Verlopen',
+    act_preview:'Voorbeeld', act_paid:'Markeer als Betaald', act_del:'Verwijderen',
+    t_approved:'Factuur goedgekeurd!', t_paid:'Gemarkeerd als betaald!',
+    t_saved:'Instellingen opgeslagen!', t_del:'Factuur verwijderd.', t_cleared:'Alle gegevens gewist.',
+    t_pdf:'PDF geëxporteerd!', t_warn:'Voeg minimaal één regelitem toe!', t_copied:'Link gekopieerd!',
+    t_ubl:'UBL geëxporteerd!',
+    empty:'Geen facturen gevonden. Maak uw eerste!',
+    c_del:'Deze factuur verwijderen?', c_clear:'Weet u het ZEKER? Dit verwijdert ALLE facturen.',
+    due_lbl:'Vervaldatum', issue_lbl:'Uitgifte',
+    no_clients:'Geen gegevens beschikbaar.',
+    pdf_type:'FACTUUR', pdf_from:'VAN', pdf_to:'AAN',
+    pdf_desc:'OMSCHRIJVING', pdf_h:'UREN', pdf_r:'TARIEF', pdf_amt:'BEDRAG',
+    pdf_tot:'TOTAAL', pdf_notes:'NOTITIES', pdf_date:'DATUM', pdf_due:'VERVALDATUM', pdf_vat:'BTW-NR',
+    pdf_subtotal:'SUBTOTAAL', pdf_vat_amt:'BTW', pdf_ritenuta:'INHOUDING', pdf_iban:'IBAN',
+    set_country:'Land', set_iban:'Bank IBAN',
+    set_vat_rate:'BTW-tarief (%)', set_vat_enabled:'BTW op factuur toepassen',
+    set_ritenuta:'Bronbelasting (20%)',
+    set_kleinunternehmer:'Kleinondernemersvrijstelling (§19 UStG)',
+    set_autoentrepreneur:'Auto-entrepreneur (BTW vrijgesteld)',
+    lbl_subtotal:'Subtotaal', lbl_vat_amt:'BTW', lbl_ritenuta:'Inhouding (20%)',
+    set_regime:'Speciaal Belastingregime',
+  },
+  de: {
+    nav_dash:'Dashboard', nav_inv:'Neue Rechnung', nav_an:'Analyse', nav_set:'Einstellungen',
+    dash_h1:'Betriebsdashboard', dash_sub:'Stunden, Umsatz und Rechnungsstatus verfolgen.',
+    kpi_tot:'Rechnungen Gesamt', kpi_pend:'Ausstehend', kpi_appr:'Offene Posten', kpi_tax:'Steuerrücklage',
+    timer_lbl:'Arbeitssession', timer_start:'START', timer_stop:'STOP', timer_rate:'Stundensatz (€/h)', timer_add_inv:'Zur Rechnung hinzufügen',
+    qs_paid:'Verdient (Bezahlt)', qs_ytd:'Laufendes Jahr', qs_over:'Überfällig', qs_over_s:'überfällige Rechnungen',
+    list_h:'Rechnungshistorie', btn_new:'Neue Rechnung',
+    f_all:'Alle', f_pend:'Ausstehend', f_appr:'Genehmigt', f_paid:'Bezahlt', f_over:'Überfällig',
+    inv_h1:'Neue Rechnung', inv_sub:'Details ausfüllen und an den Kunden senden.',
+    sec_client:'Kundeninformationen', sec_items:'Positionen',
+    lbl_cname:'Kundenname', lbl_cemail:'Kunden-E-Mail',
+    ph_cname:'z.B. ACME GmbH',
+    lbl_total:'Gesamt', btn_add_item:'+ Position Hinzufügen',
+    lbl_issue:'Rechnungsdatum', lbl_due:'Fälligkeitsdatum',
+    lbl_notes:'Notizen / Zahlungsbedingungen', ph_notes:'z.B. Zahlung innerhalb von 30 Tagen nach Erhalt...',
+    btn_gen:'LINK GENERIEREN', btn_cancel:'Abbrechen', btn_pdf:'PDF Exportieren', btn_another:'＋ Neue Rechnung',
+    succ_h:'Link Bereit!', succ_p:'Senden Sie diesen Link zur Genehmigung an Ihren Kunden.',
+    lnk_lbl:'Kundenlink (zum Kopieren klicken)',
+    col_desc:'Beschreibung', col_h:'Stunden', col_r:'Satz',
+    cv_lbl:'Rechnung', cv_from:'Von', cv_to:'An', cv_tot:'Zu Zahlender Betrag',
+    cv_approve:'GENEHMIGEN & BESTÄTIGEN', cv_back:'← Zurück zur App',
+    an_h1:'Finanzanalyse', an_sub:'Umsatzübersicht und monatliche Trends.',
+    an_earned:'Gesamt Verdient', an_out:'Offene Posten', an_avg:'Ø Rechnung',
+    an_chart:'Monatlicher Umsatz (letzte 12 Monate)', an_top:'Top Kunden',
+    set_h1:'Einstellungen', set_sub:'Ihr Freelancer-Profil und App-Einstellungen.',
+    set_prof:'Freelancer-Profil', set_name:'Name / Firmenname', set_email:'E-Mail',
+    set_vat:'USt-IdNr.', set_addr:'Adresse',
+    ph_sname:'Ihr Name oder Unternehmen', ph_saddr:'Musterstraße 1, Berlin',
+    set_fin:'Finanzielle Einstellungen', set_rate:'Standard-Stundensatz (€/h)',
+    set_tax:'% Steuerrücklage', set_cur:'Währung',
+    set_terms_h:'Standard-Zahlungsbedingungen',
+    set_terms_l:'Standardnotizen (auf jeder Rechnung vorausgefüllt)',
+    ph_terms:'z.B. Zahlung fällig innerhalb von 30 Tagen nach Rechnungsdatum.',
+    set_days:'Standard Fälligkeitstage',
+    set_lang:'Sprache',
+    set_danger:'Gefahrenzone', set_danger_p:'Löscht alle Rechnungen aus der Datenbank. Dies kann nicht rückgängig gemacht werden.',
+    btn_clear:'Alle Daten Löschen', btn_save:'EINSTELLUNGEN SPEICHERN', btn_logout:'Abmelden',
+    ph_item:'Leistungsbeschreibung',
+    s_pending:'Ausstehend', s_approved:'Genehmigt', s_paid:'Bezahlt', s_overdue:'Überfällig',
+    act_preview:'Vorschau', act_paid:'Als Bezahlt Markieren', act_del:'Löschen',
+    t_approved:'Rechnung genehmigt!', t_paid:'Als bezahlt markiert!',
+    t_saved:'Einstellungen gespeichert!', t_del:'Rechnung gelöscht.', t_cleared:'Alle Daten gelöscht.',
+    t_pdf:'PDF exportiert!', t_warn:'Mindestens eine Position hinzufügen!', t_copied:'Link kopiert!',
+    t_ubl:'UBL exportiert!',
+    empty:'Keine Rechnungen gefunden. Erste erstellen!',
+    c_del:'Diese Rechnung löschen?', c_clear:'Sind Sie SICHER? Alle Rechnungen werden gelöscht.',
+    due_lbl:'Fällig', issue_lbl:'Ausgestellt',
+    no_clients:'Keine Daten verfügbar.',
+    pdf_type:'RECHNUNG', pdf_from:'VON', pdf_to:'AN',
+    pdf_desc:'BESCHREIBUNG', pdf_h:'STUNDEN', pdf_r:'SATZ', pdf_amt:'BETRAG',
+    pdf_tot:'GESAMT', pdf_notes:'NOTIZEN', pdf_date:'DATUM', pdf_due:'FÄLLIGKEITSDATUM', pdf_vat:'USt-IdNr.',
+    pdf_subtotal:'ZWISCHENSUMME', pdf_vat_amt:'MwSt', pdf_ritenuta:'QUELLENSTEUER', pdf_iban:'IBAN',
+    set_country:'Land', set_iban:'Bank IBAN',
+    set_vat_rate:'MwSt-Satz (%)', set_vat_enabled:'MwSt auf Rechnung anwenden',
+    set_ritenuta:'Quellensteuer (20%)',
+    set_kleinunternehmer:'Kleinunternehmer (§19 UStG)',
+    set_autoentrepreneur:'Auto-entrepreneur (MwSt-befreit)',
+    lbl_subtotal:'Zwischensumme', lbl_vat_amt:'MwSt', lbl_ritenuta:'Quellensteuer (20%)',
+    set_regime:'Besonderes Steuerregime',
   }
 };
 
@@ -1022,7 +1163,9 @@ function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;'
 function fmtDate(d) {
   if (!d) return '';
   const [y,m,day] = d.split('-');
-  return S.lang === 'it' ? `${day}/${m}/${y}` : `${m}/${day}/${y}`;
+  if (S.lang === 'it' || S.lang === 'nl') return `${day}/${m}/${y}`;
+  if (S.lang === 'de') return `${day}.${m}.${y}`;
+  return `${m}/${day}/${y}`;
 }
 
 function newId() {
@@ -1065,9 +1208,9 @@ function applyTr() {
   });
   const cls_a = 'flex-1 py-2 rounded-lg text-xs font-black transition bg-accent text-black';
   const cls_i = 'flex-1 py-2 rounded-lg text-xs font-black transition text-gray-600 hover:text-white';
-  ['lang-it','lang-en'].forEach(id => {
+  ['lang-it','lang-en','lang-nl','lang-de'].forEach(id => {
     const el = document.getElementById(id);
-    if (el) el.className = (id === 'lang-'+S.lang) ? cls_a : cls_i;
+    if (el) el.className = (id === 'lang-'+S.lang) ? cls_a.replace('flex-1','') : cls_i.replace('flex-1','');
   });
   // Re-apply country-specific labels after language change
   onCountryChange();
@@ -1567,7 +1710,8 @@ function timerAddToInvoice() {
     // Clear existing items and add timer session as first item
     document.getElementById('items-box').innerHTML = '';
     itemIdx = 0;
-    addItem(S.lang === 'it' ? 'Sessione di lavoro' : 'Work session', hrs, S.timer.rate);
+    const timerDesc = {it:'Sessione di lavoro',nl:'Werksessie',de:'Arbeitssession'}[S.lang] || 'Work session';
+    addItem(timerDesc, hrs, S.timer.rate);
     // Reset timer
     S.timer.earn = 0; S.timer.elapsed = 0;
     document.getElementById('live-earn').textContent = fmt(0);
@@ -1906,6 +2050,7 @@ function renderDash() {
         ${clientUrl ? `<button onclick="navigator.clipboard.writeText('${clientUrl}').then(()=>toast('📋','${t('t_copied')}'))" class="btn-o text-[11px] py-2 px-3">${t('act_preview')}</button>` : ''}
         ${st !== 'paid' ? `<button onclick="markPaid('${safeId}')" class="btn-o text-[11px] py-2 px-3 text-indigo-400 border-indigo-900 hover:border-indigo-600">${t('act_paid')}</button>` : ''}
         <button onclick="exportPDF('${safeId}')" class="btn-o text-[11px] py-2 px-3">📄 PDF</button>
+        <button onclick="exportUBL('${safeId}')" class="btn-o text-[11px] py-2 px-3" title="UBL 2.1 e-invoice">📑 UBL</button>
         <button onclick="delInv('${safeId}')" class="btn-o text-[11px] py-2 px-3 text-red-400 border-red-900 hover:border-red-600 ml-auto">${t('act_del')}</button>
       </div>
     </div>`;
@@ -2256,6 +2401,93 @@ function exportPDF(id) {
 
   doc.save(`${inv.id}.pdf`);
   toast('📄', t('t_pdf'));
+}
+
+// ── UBL 2.1 EXPORT ────────────────────────────────────────────────────
+function exportUBL(id) {
+  const inv = S.invoices.find(i => i.id === id);
+  if (!inv) return;
+  const cur = S.settings.currency || 'EUR';
+  const code = S.settings.country || 'IT';
+  const ctry = COUNTRIES[code] || COUNTRIES.IT;
+  const vatCode = S.settings.kleinunternehmer ? 'E' : (parseFloat(inv.vatRate||0) === 0 ? 'Z' : 'S');
+  const vatPct  = S.settings.kleinunternehmer ? 0 : parseFloat(inv.vatRate||0);
+  const subtotal = parseFloat(inv.subtotal || inv.total || 0).toFixed(2);
+  const vatAmt  = parseFloat(inv.vatAmount || 0).toFixed(2);
+  const total   = parseFloat(inv.total || 0).toFixed(2);
+
+  const lines = (inv.items || []).map((it, i) => {
+    const lineAmt = (parseFloat(it.hours||0) * parseFloat(it.rate||0)).toFixed(2);
+    return `  <cac:InvoiceLine>
+    <cbc:ID>${i+1}</cbc:ID>
+    <cbc:InvoicedQuantity unitCode="HUR">${parseFloat(it.hours||0).toFixed(2)}</cbc:InvoicedQuantity>
+    <cbc:LineExtensionAmount currencyID="${cur}">${lineAmt}</cbc:LineExtensionAmount>
+    <cac:Item>
+      <cbc:Description>${esc(it.desc||'')}</cbc:Description>
+      <cbc:Name>${esc((it.desc||'').substring(0,40))}</cbc:Name>
+      <cac:ClassifiedTaxCategory>
+        <cbc:ID>${vatCode}</cbc:ID>
+        <cbc:Percent>${vatPct}</cbc:Percent>
+        <cac:TaxScheme><cbc:ID>${ctry.taxName||'VAT'}</cbc:ID></cac:TaxScheme>
+      </cac:ClassifiedTaxCategory>
+    </cac:Item>
+    <cac:Price>
+      <cbc:PriceAmount currencyID="${cur}">${parseFloat(it.rate||0).toFixed(2)}</cbc:PriceAmount>
+    </cac:Price>
+  </cac:InvoiceLine>`;
+  }).join('\n');
+
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"
+         xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2"
+         xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">
+  <cbc:UBLVersionID>2.1</cbc:UBLVersionID>
+  <cbc:CustomizationID>urn:cen.eu:en16931:2017#compliant#urn:fdc:peppol.eu:2017:poacc:billing:3.0</cbc:CustomizationID>
+  <cbc:ProfileID>urn:fdc:peppol.eu:2017:poacc:billing:01:1.0</cbc:ProfileID>
+  <cbc:ID>${esc(inv.id)}</cbc:ID>
+  <cbc:IssueDate>${inv.issueDate||new Date().toISOString().split('T')[0]}</cbc:IssueDate>${inv.dueDate ? `\n  <cbc:DueDate>${inv.dueDate}</cbc:DueDate>` : ''}
+  <cbc:InvoiceTypeCode>380</cbc:InvoiceTypeCode>
+  <cbc:DocumentCurrencyCode>${cur}</cbc:DocumentCurrencyCode>
+  <cac:AccountingSupplierParty>
+    <cac:Party>
+      <cac:PartyName><cbc:Name>${esc(S.settings.name||S.settings.email||'')}</cbc:Name></cac:PartyName>${S.settings.address ? `\n      <cac:PostalAddress><cbc:StreetName>${esc(S.settings.address)}</cbc:StreetName><cac:Country><cbc:IdentificationCode>${code}</cbc:IdentificationCode></cac:Country></cac:PostalAddress>` : ''}${S.settings.vat ? `\n      <cac:PartyTaxScheme><cbc:CompanyID>${esc(S.settings.vat)}</cbc:CompanyID><cac:TaxScheme><cbc:ID>${ctry.taxName||'VAT'}</cbc:ID></cac:TaxScheme></cac:PartyTaxScheme>` : ''}
+      <cac:PartyLegalEntity><cbc:RegistrationName>${esc(S.settings.name||'')}</cbc:RegistrationName></cac:PartyLegalEntity>
+      <cac:Contact><cbc:ElectronicMail>${esc(S.settings.email||'')}</cbc:ElectronicMail></cac:Contact>
+    </cac:Party>
+  </cac:AccountingSupplierParty>
+  <cac:AccountingCustomerParty>
+    <cac:Party>
+      <cac:PartyName><cbc:Name>${esc(inv.client||'')}</cbc:Name></cac:PartyName>${inv.clientEmail ? `\n      <cac:Contact><cbc:ElectronicMail>${esc(inv.clientEmail)}</cbc:ElectronicMail></cac:Contact>` : ''}
+    </cac:Party>
+  </cac:AccountingCustomerParty>${S.settings.iban ? `\n  <cac:PaymentMeans>\n    <cbc:PaymentMeansCode>30</cbc:PaymentMeansCode>\n    <cac:PayeeFinancialAccount><cbc:ID>${esc(S.settings.iban)}</cbc:ID></cac:PayeeFinancialAccount>\n  </cac:PaymentMeans>` : ''}${inv.notes ? `\n  <cac:PaymentTerms><cbc:Note>${esc(inv.notes)}</cbc:Note></cac:PaymentTerms>` : ''}
+  <cac:TaxTotal>
+    <cbc:TaxAmount currencyID="${cur}">${vatAmt}</cbc:TaxAmount>
+    <cac:TaxSubtotal>
+      <cbc:TaxableAmount currencyID="${cur}">${subtotal}</cbc:TaxableAmount>
+      <cbc:TaxAmount currencyID="${cur}">${vatAmt}</cbc:TaxAmount>
+      <cac:TaxCategory>
+        <cbc:ID>${vatCode}</cbc:ID>
+        <cbc:Percent>${vatPct}</cbc:Percent>
+        <cac:TaxScheme><cbc:ID>${ctry.taxName||'VAT'}</cbc:ID></cac:TaxScheme>
+      </cac:TaxCategory>
+    </cac:TaxSubtotal>
+  </cac:TaxTotal>
+  <cac:LegalMonetaryTotal>
+    <cbc:LineExtensionAmount currencyID="${cur}">${subtotal}</cbc:LineExtensionAmount>
+    <cbc:TaxExclusiveAmount currencyID="${cur}">${subtotal}</cbc:TaxExclusiveAmount>
+    <cbc:TaxInclusiveAmount currencyID="${cur}">${total}</cbc:TaxInclusiveAmount>
+    <cbc:PayableAmount currencyID="${cur}">${total}</cbc:PayableAmount>
+  </cac:LegalMonetaryTotal>
+${lines}
+</Invoice>`;
+
+  const blob = new Blob([xml], { type: 'application/xml' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = `${inv.id}.xml`;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a); URL.revokeObjectURL(url);
+  toast('📑', t('t_ubl'));
 }
 
 // ── BOOT ──────────────────────────────────────────────────────────────
