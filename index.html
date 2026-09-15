@@ -14,11 +14,12 @@
             theme: {
                 extend: {
                     fontFamily: { sans: ['Inter', 'sans-serif'] },
-                    colors: { accent: '#ffcc00', dark: '#0a0a0a', panel: '#111111', surface: '#1a1a1a' }
+                    colors: { accent: 'var(--accent)', dark: '#0a0a0a', panel: '#111111', surface: '#1a1a1a' }
                 }
             }
         }
     </script>
+    <style id="theme-style"></style>
     <style>
         * { -webkit-font-smoothing: antialiased; }
         body { background-color: #0a0a0a; color: white; }
@@ -26,13 +27,13 @@
         /* Ensure Tailwind's .hidden always wins over .flex/.flex-col etc. */
         .hidden { display: none !important; }
 
-        .neon   { border: 1px solid rgba(255,204,0,0.2); box-shadow: 0 0 25px rgba(255,204,0,0.06); }
-        .neon-s { border: 1px solid rgba(255,204,0,0.45); box-shadow: 0 0 30px rgba(255,204,0,0.18); }
+        .neon   { border: 1px solid rgba(var(--accent-rgb),0.2); box-shadow: 0 0 25px rgba(var(--accent-rgb),0.06); }
+        .neon-s { border: 1px solid rgba(var(--accent-rgb),0.45); box-shadow: 0 0 30px rgba(var(--accent-rgb),0.18); }
 
         ::-webkit-scrollbar { width: 5px; }
         ::-webkit-scrollbar-track { background: #0a0a0a; }
         ::-webkit-scrollbar-thumb { background: #222; border-radius: 3px; }
-        ::-webkit-scrollbar-thumb:hover { background: #ffcc00; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
 
         @keyframes slideIn { from { transform: translateX(115%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
         @keyframes fadeUp  { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
@@ -48,15 +49,15 @@
             border-radius: 10px; padding: 13px 16px; color: white; font-weight: 500;
             font-size: 0.9rem; transition: border-color .18s, box-shadow .18s; outline: none;
         }
-        .ifield:focus { border-color: #ffcc00; box-shadow: 0 0 0 3px rgba(255,204,0,0.08); }
+        .ifield:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(var(--accent-rgb),0.08); }
         .ifield::placeholder { color: #333; }
 
         .btn-y {
-            background: #ffcc00; color: #000; border-radius: 11px;
+            background: var(--accent); color: var(--accent-fg); border-radius: 11px;
             font-weight: 900; font-size: 0.88rem; letter-spacing: 0.04em; text-transform: uppercase;
             transition: all .15s; cursor: pointer; border: none; padding: 13px 24px;
         }
-        .btn-y:hover  { background: #ffd633; transform: translateY(-1px); box-shadow: 0 4px 22px rgba(255,204,0,0.28); }
+        .btn-y:hover  { filter: brightness(1.1); transform: translateY(-1px); box-shadow: 0 4px 22px rgba(var(--accent-rgb),0.28); }
         .btn-y:active { transform: scale(0.97); }
         .btn-y:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 
@@ -74,14 +75,14 @@
             transition: all .15s; background: transparent; border: none; cursor: pointer;
         }
         .nav-btn:hover  { background: #181818; color: #bbb; }
-        .nav-btn.active { background: #ffcc00; color: #000; }
+        .nav-btn.active { background: var(--accent); color: var(--accent-fg); }
         .nav-btn .ico   { font-size: 1rem; min-width: 18px; text-align: center; }
 
         .card { background: #111; border: 1px solid #1c1c1c; border-radius: 18px; padding: 22px; }
         .inv-row { background: #0d0d0d; border: 1px solid #1a1a1a; border-radius: 13px; padding: 18px 20px; transition: border-color .2s; }
         .inv-row:hover { border-color: #262626; }
 
-        .badge-pending  { background: rgba(255,204,0,.1);  color: #ffcc00; }
+        .badge-pending  { background: rgba(var(--accent-rgb),.1); color: var(--accent); }
         .badge-approved { background: rgba(34,197,94,.1);  color: #4ade80; }
         .badge-paid     { background: rgba(129,140,248,.1); color: #a5b4fc; }
         .badge-overdue  { background: rgba(239,68,68,.1);   color: #fca5a5; }
@@ -857,6 +858,14 @@ create policy "owner_settings" on public.settings for all to authenticated
                 </div>
             </div>
 
+            <!-- Theme / accent color -->
+            <div class="card" style="background:#0e0e0e;border-color:#1e1e1e;">
+                <h3 class="text-[10px] font-black uppercase tracking-widest text-gray-500 mb-4" data-i18n="set_theme">Colore Tema</h3>
+                <div class="flex gap-3 flex-wrap" id="theme-swatches">
+                    <!-- populated by JS -->
+                </div>
+            </div>
+
             <div class="card border-red-900" style="background:#0e0e0e;">
                 <h3 class="text-[10px] font-black uppercase tracking-widest text-red-500 mb-2" data-i18n="set_danger">Zona Pericolosa</h3>
                 <p class="text-gray-600 text-xs mb-4" data-i18n="set_danger_p">Elimina tutti i proforma dal database. Azione irreversibile.</p>
@@ -916,7 +925,7 @@ const L = {
     set_terms_l:'Note standard (pre-compilate su ogni proforma)',
     ph_terms:'Es. Pagamento dovuto entro 30 giorni dalla data di emissione.',
     set_days:'Giorni scadenza default',
-    set_lang:'Lingua',
+    set_lang:'Lingua', set_theme:'Colore Tema',
     set_danger:'Zona Pericolosa', set_danger_p:'Elimina tutti i proforma dal database. Azione irreversibile.',
     btn_clear:'Cancella Tutti i Dati', btn_save:'SALVA IMPOSTAZIONI', btn_logout:'Logout',
     ph_item:'Descrizione servizio',
@@ -980,7 +989,7 @@ const L = {
     set_terms_l:'Standard notes (pre-filled on every invoice)',
     ph_terms:'e.g. Payment is due within 30 days of the invoice date.',
     set_days:'Default due days',
-    set_lang:'Language',
+    set_lang:'Language', set_theme:'Accent Color',
     set_danger:'Danger Zone', set_danger_p:'Deletes all invoices from the database. This cannot be undone.',
     btn_clear:'Clear All Data', btn_save:'SAVE SETTINGS', btn_logout:'Logout',
     ph_item:'Service description',
@@ -1044,7 +1053,7 @@ const L = {
     set_terms_l:'Standaardnotities (vooraf ingevuld op elke factuur)',
     ph_terms:'bijv. Betaling verschuldigd binnen 30 dagen na factuurdatum.',
     set_days:'Standaard vervaldagen',
-    set_lang:'Taal',
+    set_lang:'Taal', set_theme:'Accentkleur',
     set_danger:'Gevarenzone', set_danger_p:'Verwijdert alle facturen uit de database. Dit kan niet ongedaan worden gemaakt.',
     btn_clear:'Alle Gegevens Wissen', btn_save:'INSTELLINGEN OPSLAAN', btn_logout:'Uitloggen',
     ph_item:'Serviceomschrijving',
@@ -1108,7 +1117,7 @@ const L = {
     set_terms_l:'Standardnotizen (auf jeder Rechnung vorausgefüllt)',
     ph_terms:'z.B. Zahlung fällig innerhalb von 30 Tagen nach Rechnungsdatum.',
     set_days:'Standard Fälligkeitstage',
-    set_lang:'Sprache',
+    set_lang:'Sprache', set_theme:'Akzentfarbe',
     set_danger:'Gefahrenzone', set_danger_p:'Löscht alle Rechnungen aus der Datenbank. Dies kann nicht rückgängig gemacht werden.',
     btn_clear:'Alle Daten Löschen', btn_save:'EINSTELLUNGEN SPEICHERN', btn_logout:'Abmelden',
     ph_item:'Leistungsbeschreibung',
@@ -2215,6 +2224,9 @@ function renderAnalytics() {
 
 // ── SETTINGS ──────────────────────────────────────────────────────────
 function loadSetForm() {
+  let activeTheme = DEFAULT_THEME;
+  try { activeTheme = localStorage.getItem('df_theme') || DEFAULT_THEME; } catch(_) {}
+  renderThemeSwatches(activeTheme);
   document.getElementById('s-country').value  = S.settings.country     || 'IT';
   document.getElementById('s-name').value     = S.settings.name        || '';
   document.getElementById('s-email').value    = S.settings.email       || '';
@@ -2547,6 +2559,45 @@ ${lines}
   toast('📑', t('t_ubl'));
 }
 
+// ── THEME ─────────────────────────────────────────────────────────────
+const THEMES = [
+  { key:'blue',   hex:'#3b82f6', rgb:'59,130,246',  fg:'#fff', label:'Blue'   },
+  { key:'green',  hex:'#22c55e', rgb:'34,197,94',   fg:'#000', label:'Green'  },
+  { key:'gold',   hex:'#ffcc00', rgb:'255,204,0',   fg:'#000', label:'Gold'   },
+  { key:'purple', hex:'#a855f7', rgb:'168,85,247',  fg:'#fff', label:'Purple' },
+  { key:'coral',  hex:'#f97316', rgb:'249,115,22',  fg:'#000', label:'Coral'  },
+  { key:'white',  hex:'#e5e7eb', rgb:'229,231,235', fg:'#000', label:'White'  },
+];
+const DEFAULT_THEME = 'blue';
+
+function setTheme(key, save = true) {
+  const th = THEMES.find(t => t.key === key) || THEMES.find(t => t.key === DEFAULT_THEME);
+  document.getElementById('theme-style').textContent = `
+    :root{--accent:${th.hex};--accent-rgb:${th.rgb};--accent-fg:${th.fg};}
+  `;
+  if (save) {
+    try { localStorage.setItem('df_theme', key); } catch(_) {}
+  }
+  renderThemeSwatches(key);
+}
+
+function renderThemeSwatches(activeKey) {
+  const wrap = document.getElementById('theme-swatches');
+  if (!wrap) return;
+  wrap.innerHTML = THEMES.map(th => `
+    <button onclick="setTheme('${th.key}')" title="${th.label}"
+      class="w-9 h-9 rounded-full transition-all border-2 flex items-center justify-center text-xs font-black"
+      style="background:${th.hex};border-color:${activeKey===th.key?'white':'transparent'};transform:${activeKey===th.key?'scale(1.2)':'scale(1)'}">
+      ${activeKey===th.key?'✓':''}
+    </button>`).join('');
+}
+
+function loadTheme() {
+  let key = DEFAULT_THEME;
+  try { key = localStorage.getItem('df_theme') || DEFAULT_THEME; } catch(_) {}
+  setTheme(key, false);
+}
+
 // ── DUPLICATE INVOICE ─────────────────────────────────────────────────
 function duplicateInv(id) {
   const inv = S.invoices.find(i => i.id === id);
@@ -2754,6 +2805,7 @@ function emailModalCopy() {
 
 // ── BOOT ──────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
+  loadTheme();
   showView('loading', { msg: 'Starting...' });
   boot();
 });
