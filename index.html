@@ -285,11 +285,13 @@
   status           text          not null default 'pending' check (status in ('pending','approved','paid')),
   freelancer_iban  text,
   freelancer_name  text,
+  pay_link         text,
   created_at       timestamptz   not null default now()
 );
 -- if upgrading an existing table, run:
 -- alter table public.invoices add column if not exists freelancer_iban text;
 -- alter table public.invoices add column if not exists freelancer_name text;
+-- alter table public.invoices add column if not exists pay_link text;
 
 create table if not exists public.settings (
   user_id          uuid          primary key references auth.users(id) on delete cascade,
@@ -320,13 +322,20 @@ alter table public.settings  enable row level security;
 create policy "owner_invoices" on public.invoices for all to authenticated
   using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
-create policy "anon_read" on public.invoices for select to anon using (true);
-
-create policy "anon_approve" on public.invoices for update to anon
-  using (status = 'pending') with check (status = 'approved');
-
 create policy "owner_settings" on public.settings for all to authenticated
-  using (auth.uid() = user_id) with check (auth.uid() = user_id);</pre>
+  using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- Clients reach a single invoice only through its secret token
+create or replace function public.get_invoice_by_token(p_token uuid)
+returns setof public.invoices language sql stable security definer set search_path = public
+as $$ select * from public.invoices where public_token = p_token limit 1 $$;
+
+create or replace function public.approve_invoice(p_token uuid)
+returns void language sql security definer set search_path = public
+as $$ update public.invoices set status = 'approved' where public_token = p_token and status = 'pending' $$;
+
+grant execute on function public.get_invoice_by_token(uuid) to anon, authenticated;
+grant execute on function public.approve_invoice(uuid) to anon, authenticated;</pre>
                             <button onclick="copySql()" class="absolute top-2 right-2 bg-accent text-black text-[10px] font-black px-3 py-1.5 rounded-lg transition hover:bg-yellow-300">COPY</button>
                         </div>
                     </div>
@@ -570,6 +579,13 @@ create policy "owner_settings" on public.settings for all to authenticated
                     <textarea id="in-notes" rows="3" class="ifield resize-none" data-phi="ph_notes"></textarea>
                 </div>
 
+                <!-- Optional one-tap payment link -->
+                <div class="mb-7">
+                    <label class="block text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-2" data-i18n="lbl_paylink">Payment link (optional)</label>
+                    <input type="url" id="in-paylink" class="ifield" data-phi="ph_paylink" inputmode="url" autocomplete="off">
+                    <div class="text-[11px] text-gray-600 mt-2" data-i18n="hint_paylink">Tikkie, ING betaalverzoek, bunq.me, Revolut, PayPal…</div>
+                </div>
+
                 <div class="flex gap-3">
                     <button type="submit" id="btn-gen-inv" class="btn-y flex-1" data-i18n="btn_gen">GENERA LINK</button>
                     <button type="button" onclick="showView('dashboard')" class="btn-o" data-i18n="btn_cancel">Annulla</button>
@@ -655,13 +671,22 @@ create policy "owner_settings" on public.settings for all to authenticated
                 <div id="cv-notes" class="mt-2 text-xs text-gray-400 italic"></div>
             </div>
 
-            <div class="px-7 py-6">
-                <!-- SEPA payment QR (shown only when IBAN is available) -->
-                <div id="cv-qr-wrap" class="hidden mb-5 flex flex-col items-center gap-2">
-                    <div class="text-[10px] text-gray-400 uppercase font-bold tracking-widest" id="cv-qr-lbl">Pay by bank transfer</div>
-                    <canvas id="cv-qr-canvas" class="rounded-xl" style="width:140px;height:140px;"></canvas>
-                    <div class="text-[10px] text-gray-400 text-center" id="cv-qr-iban"></div>
+            <!-- Pay: one-tap link, SEPA QR, and copyable bank details -->
+            <div id="cv-pay" class="hidden px-7 py-6 border-b border-gray-100">
+                <div class="text-[10px] text-gray-400 uppercase font-black tracking-widest mb-4" data-i18n="pay_h">Pay</div>
+                <a id="cv-paylink" href="#" target="_blank" rel="noopener noreferrer"
+                   class="hidden w-full flex items-center justify-center gap-2 py-4 rounded-2xl font-black text-base mb-5 transition active:scale-95"
+                   style="background:var(--accent);color:var(--accent-fg);"></a>
+                <div id="cv-bank" class="hidden">
+                    <div class="flex gap-4 items-center mb-4">
+                        <canvas id="cv-qr-canvas" class="rounded-xl border border-gray-100 flex-shrink-0" style="width:116px;height:116px;"></canvas>
+                        <div class="text-xs text-gray-500 leading-relaxed" data-i18n="pay_scan">Scan with your banking app.</div>
+                    </div>
+                    <div id="cv-bank-rows" class="rounded-xl bg-gray-50 divide-y divide-gray-100"></div>
                 </div>
+            </div>
+
+            <div class="px-7 py-6">
                 <button id="btn-approve" class="w-full bg-black text-white py-4 rounded-2xl font-black text-base transition hover:bg-gray-800 active:scale-95">
                     <span data-i18n="cv_approve">APPROVA E CONFERMA</span>
                 </button>
@@ -948,6 +973,12 @@ const L = {
     t_saved:'Impostazioni salvate!', t_del:'Proforma eliminato.', t_cleared:'Dati eliminati.',
     t_pdf:'PDF esportato!', t_warn:'Aggiungi almeno una voce!', t_copied:'Link copiato!',
     t_ubl:'UBL esportato!', t_email_copied:'Testo copiato!',
+    pay_h:'Paga', pay_now:'Paga ora', pay_copy:'Copia', pay_copied:'Copiato', pay_amount:'Importo',
+    pay_scan:'Inquadra il QR con l\'app della tua banca: importo, IBAN e causale si compilano da soli.',
+    lbl_paylink:'Link di pagamento (opzionale)', ph_paylink:'https://tikkie.me/…',
+    hint_paylink:'Tikkie, ING betaalverzoek, bunq.me, Revolut, PayPal… Il cliente vede un pulsante "Paga ora".',
+    t_badlink:'Il link di pagamento deve iniziare con https://',
+    pdf_pay:'PAGAMENTO', pdf_benef:'Intestatario', pdf_ref:'Causale', pdf_paylink:'Paga online »',
     btn_email:'Invia per Email',
     em_title:'Invia Proforma', em_to:'A', em_subj_lbl:'Oggetto', em_body_lbl:'Messaggio',
     em_open:'Apri nel client email', em_copy:'Copia testo',
@@ -1012,6 +1043,12 @@ const L = {
     t_saved:'Settings saved!', t_del:'Invoice deleted.', t_cleared:'All data cleared.',
     t_pdf:'PDF exported!', t_warn:'Add at least one line item!', t_copied:'Link copied!',
     t_ubl:'UBL exported!', t_email_copied:'Text copied!',
+    pay_h:'Pay', pay_now:'Pay now', pay_copy:'Copy', pay_copied:'Copied', pay_amount:'Amount',
+    pay_scan:'Scan with your banking app — amount, IBAN and reference fill in automatically.',
+    lbl_paylink:'Payment link (optional)', ph_paylink:'https://tikkie.me/…',
+    hint_paylink:'Tikkie, ING payment request, bunq.me, Revolut, PayPal… Your client gets a "Pay now" button.',
+    t_badlink:'The payment link must start with https://',
+    pdf_pay:'PAYMENT', pdf_benef:'Beneficiary', pdf_ref:'Reference', pdf_paylink:'Pay online »',
     btn_email:'Send by Email',
     em_title:'Send Invoice', em_to:'To', em_subj_lbl:'Subject', em_body_lbl:'Message',
     em_open:'Open in Email Client', em_copy:'Copy Body',
@@ -1076,6 +1113,12 @@ const L = {
     t_saved:'Instellingen opgeslagen!', t_del:'Factuur verwijderd.', t_cleared:'Alle gegevens gewist.',
     t_pdf:'PDF geëxporteerd!', t_warn:'Voeg minimaal één regelitem toe!', t_copied:'Link gekopieerd!',
     t_ubl:'UBL geëxporteerd!', t_email_copied:'Tekst gekopieerd!',
+    pay_h:'Betalen', pay_now:'Nu betalen', pay_copy:'Kopieer', pay_copied:'Gekopieerd', pay_amount:'Bedrag',
+    pay_scan:'Scan met je bank-app — bedrag, IBAN en kenmerk worden automatisch ingevuld.',
+    lbl_paylink:'Betaallink (optioneel)', ph_paylink:'https://tikkie.me/…',
+    hint_paylink:'Tikkie, ING betaalverzoek, bunq.me, Revolut, PayPal… Je klant krijgt een "Nu betalen"-knop.',
+    t_badlink:'De betaallink moet beginnen met https://',
+    pdf_pay:'BETALING', pdf_benef:'T.n.v.', pdf_ref:'Kenmerk', pdf_paylink:'Online betalen »',
     btn_email:'Verstuur per E-mail',
     em_title:'Factuur Versturen', em_to:'Aan', em_subj_lbl:'Onderwerp', em_body_lbl:'Bericht',
     em_open:'Openen in e-mailprogramma', em_copy:'Tekst Kopiëren',
@@ -1140,6 +1183,12 @@ const L = {
     t_saved:'Einstellungen gespeichert!', t_del:'Rechnung gelöscht.', t_cleared:'Alle Daten gelöscht.',
     t_pdf:'PDF exportiert!', t_warn:'Mindestens eine Position hinzufügen!', t_copied:'Link kopiert!',
     t_ubl:'UBL exportiert!', t_email_copied:'Text kopiert!',
+    pay_h:'Bezahlen', pay_now:'Jetzt bezahlen', pay_copy:'Kopieren', pay_copied:'Kopiert', pay_amount:'Betrag',
+    pay_scan:'Mit der Banking-App scannen — Betrag, IBAN und Verwendungszweck werden automatisch ausgefüllt.',
+    lbl_paylink:'Zahlungslink (optional)', ph_paylink:'https://paypal.me/…',
+    hint_paylink:'PayPal, Revolut, bunq.me, Tikkie… Ihr Kunde erhält einen "Jetzt bezahlen"-Button.',
+    t_badlink:'Der Zahlungslink muss mit https:// beginnen',
+    pdf_pay:'ZAHLUNG', pdf_benef:'Empfänger', pdf_ref:'Verwendungszweck', pdf_paylink:'Online bezahlen »',
     btn_email:'Per E-Mail Senden',
     em_title:'Rechnung Senden', em_to:'An', em_subj_lbl:'Betreff', em_body_lbl:'Nachricht',
     em_open:'Im E-Mail-Programm öffnen', em_copy:'Text Kopieren',
@@ -1168,8 +1217,8 @@ const COUNTRIES = {
        id2:{it:'Codice Fiscale',en:'Fiscal Code'}, id2Ph:'RSSMRA80A01H501U',
        requiresIBAN:true, extraToggles:['ritenuta'] },
   NL:{ name:{it:'Paesi Bassi',en:'Netherlands'}, currency:'EUR', vatRate:21, taxName:'BTW',
-       id1:{it:'KVK Nummer',en:'KVK Number'}, id1Ph:'12345678',
-       id2:{it:'BTW Nummer',en:'BTW Number'}, id2Ph:'NL123456789B01',
+       id1:{it:'KVK Nummer',en:'KVK Number',nl:'KvK-nummer',de:'KVK-Nummer'}, id1Ph:'12345678',
+       id2:{it:'BTW Nummer',en:'VAT ID',nl:'Btw-id',de:'USt-IdNr.'}, id2Ph:'NL123456789B01',
        requiresIBAN:true, extraToggles:[] },
   DE:{ name:{it:'Germania',en:'Germany'}, currency:'EUR', vatRate:19, taxName:'MwSt',
        id1:{it:'Steuernummer',en:'Tax Number'}, id1Ph:'12/345/67890',
@@ -1574,6 +1623,9 @@ async function boot() {
   const urlParams = new URLSearchParams(window.location.search);
   const token = urlParams.get('token');
   if (token) {
+    const browserLang = (navigator.language || 'en').slice(0, 2).toLowerCase();
+    S.lang = L[browserLang] ? browserLang : 'en';
+    applyTr();
     showView('client');
     await loadClientView(token);
     return;
@@ -1679,6 +1731,7 @@ function dbToInv(r) {
     status:         r.status,
     freelancerIban: r.freelancer_iban  || '',
     freelancerName: r.freelancer_name  || '',
+    payLink:        r.pay_link         || '',
     createdAt:      r.created_at,
   };
 }
@@ -1702,6 +1755,7 @@ function invToDb(inv) {
     status:           inv.status,
     freelancer_iban:  S.settings.iban      || null,
     freelancer_name:  S.settings.name      || null,
+    pay_link:         inv.payLink          || null,
     created_at:       inv.createdAt,
   };
 }
@@ -1884,6 +1938,10 @@ async function generateInvoice(e) {
   const items = getItems();
   if (!items.length) { toast('⚠️', t('t_warn')); return; }
 
+  const rawLink = document.getElementById('in-paylink').value.trim();
+  const payLink = safeHttpsUrl(rawLink);
+  if (rawLink && !payLink) { toast('⚠️', t('t_badlink')); return; }
+
   const btn = document.getElementById('btn-gen-inv');
   btn.disabled = true;
   btn.textContent = '...';
@@ -1898,6 +1956,7 @@ async function generateInvoice(e) {
     issueDate:      document.getElementById('in-issue').value,
     dueDate:        document.getElementById('in-due').value,
     notes:          document.getElementById('in-notes').value.trim(),
+    payLink,
     items,
     subtotal:       subtotal.toFixed(2),
     vatAmount:      vatAmt.toFixed(2),
@@ -1912,10 +1971,11 @@ async function generateInvoice(e) {
   try {
     const row = invToDb(inv);
     let { data, error } = await _sb.from('invoices').insert([row]).select().single();
-    // Older databases lack the freelancer_* columns; save without them rather than fail.
-    if (error && /freelancer_/.test(error.message || '')) {
+    // Older databases lack the newer columns; save without them rather than fail.
+    if (error && /freelancer_|pay_link/.test(error.message || '')) {
       delete row.freelancer_iban;
       delete row.freelancer_name;
+      delete row.pay_link;
       ({ data, error } = await _sb.from('invoices').insert([row]).select().single());
     }
     if (error) throw error;
@@ -1969,20 +2029,13 @@ async function loadClientView(token) {
   errEl.classList.add('hidden');
 
   try {
-    const { data, error } = await _sb
-      .from('invoices')
-      .select('*')
-      .eq('public_token', token)
-      .single();
-
-    if (error || !data) throw new Error('Invoice not found');
+    const data = await fetchInvoiceByToken(token);
+    if (!data) throw new Error('Invoice not found');
 
     const inv = dbToInv(data);
 
-    // We also need the freelancer's settings — but anon can't read settings.
-    // We'll show what's available on the invoice itself.
     document.getElementById('cv-id').textContent    = inv.id;
-    document.getElementById('cv-from').textContent  = 'Freelancer';
+    document.getElementById('cv-from').textContent  = inv.freelancerName || 'Freelancer';
     document.getElementById('cv-from-vat').textContent = '';
     document.getElementById('cv-to').textContent    = inv.client;
     document.getElementById('cv-email').textContent = inv.clientEmail || '';
@@ -2012,11 +2065,11 @@ async function loadClientView(token) {
           <div class="font-bold text-gray-800">${esc(it.desc)}</div>
           ${it.hours ? `<div class="text-gray-400 text-xs">${esc(String(it.hours))}h × ${sym()}${esc(String(it.rate))}</div>` : ''}
         </div>
-        <div class="font-black text-gray-900">${fmt(it.amount)}</div>
+        <div class="font-black text-gray-900 whitespace-nowrap pl-3">${fmt(it.amount)}</div>
       </div>`).join('');
 
-    document.getElementById('cv-issue').textContent = inv.issueDate ? `Issued: ${inv.issueDate}` : '';
-    document.getElementById('cv-due').textContent   = inv.dueDate   ? `Due: ${inv.dueDate}`      : '';
+    document.getElementById('cv-issue').textContent = inv.issueDate ? `${t('issue_lbl')}: ${fmtDate(inv.issueDate)}` : '';
+    document.getElementById('cv-due').textContent   = inv.dueDate   ? `${t('due_lbl')}: ${fmtDate(inv.dueDate)}`   : '';
     document.getElementById('cv-notes').textContent = inv.notes || '';
 
     const btn = document.getElementById('btn-approve');
@@ -2024,29 +2077,20 @@ async function loadClientView(token) {
     backWrap.classList.add('hidden');
 
     if (['approved','paid'].includes(inv.status)) {
-      btn.innerHTML = `✔ ${inv.status.toUpperCase()}`;
+      btn.textContent = `✔ ${t('s_' + inv.status).toUpperCase()}`;
       btn.className = 'w-full bg-gray-100 text-gray-400 py-4 rounded-2xl font-black text-base cursor-not-allowed';
       btn.disabled  = true;
     } else {
-      btn.innerHTML = `<span>APPROVE &amp; CONFIRM</span>`;
+      btn.textContent = t('cv_approve');
       btn.className = 'w-full bg-black text-white py-4 rounded-2xl font-black text-base transition hover:bg-gray-800 active:scale-95';
       btn.disabled  = false;
       btn.onclick   = () => approveAnon(token, btn);
     }
 
+    renderClientPay(inv);
+
     loadEl.classList.add('hidden');
     if (card) card.classList.remove('hidden');
-
-    // SEPA QR — rendered after card is visible so canvas has dimensions
-    if (inv.iban || inv.freelancerIban) {
-      const iban  = inv.iban || inv.freelancerIban || '';
-      const name  = inv.freelancerName || '';
-      const total = parseFloat(inv.total || 0).toFixed(2);
-      renderSepaQr('cv-qr-canvas', iban, name, total, inv.id).then(() => {
-        document.getElementById('cv-qr-wrap').classList.remove('hidden');
-        document.getElementById('cv-qr-iban').textContent = iban;
-      }).catch(() => {});
-    }
 
   } catch (err) {
     loadEl.classList.add('hidden');
@@ -2056,21 +2100,83 @@ async function loadClientView(token) {
 
 async function approveAnon(token, btn) {
   btn.disabled = true;
-  btn.textContent = 'Saving...';
+  btn.textContent = '…';
   try {
-    const { error } = await _sb
-      .from('invoices')
-      .update({ status: 'approved' })
-      .eq('public_token', token)
-      .eq('status', 'pending');
+    let { error } = await _sb.rpc('approve_invoice', { p_token: token });
+    // Databases set up before the secure functions existed
+    if (error) ({ error } = await _sb.from('invoices').update({ status: 'approved' })
+      .eq('public_token', token).eq('status', 'pending'));
     if (error) throw error;
-    btn.innerHTML = '✔ APPROVED';
+    btn.textContent = `✔ ${t('s_approved').toUpperCase()}`;
     btn.className = 'w-full bg-green-100 text-green-600 py-4 rounded-2xl font-black text-base cursor-not-allowed';
   } catch (err) {
     btn.disabled = false;
-    btn.textContent = 'APPROVE & CONFIRM';
+    btn.textContent = t('cv_approve');
     toast('❌', err.message || 'Failed to approve');
   }
+}
+
+async function fetchInvoiceByToken(token) {
+  let { data, error } = await _sb.rpc('get_invoice_by_token', { p_token: token });
+  if (!error) return Array.isArray(data) ? data[0] : data;
+  // Databases set up before the secure functions existed
+  ({ data, error } = await _sb.from('invoices').select('*').eq('public_token', token).single());
+  if (error) throw error;
+  return data;
+}
+
+function safeHttpsUrl(u) {
+  try { const url = new URL(String(u || '').trim()); return url.protocol === 'https:' ? url.href : ''; }
+  catch { return ''; }
+}
+
+function renderClientPay(inv) {
+  const iban    = (inv.freelancerIban || '').replace(/\s/g, '').toUpperCase();
+  const payLink = safeHttpsUrl(inv.payLink);
+  const unpaid  = inv.status !== 'paid';
+  const wrap    = document.getElementById('cv-pay');
+  wrap.classList.toggle('hidden', !unpaid || (!iban && !payLink));
+  if (!unpaid) return;
+
+  const linkEl = document.getElementById('cv-paylink');
+  linkEl.classList.toggle('hidden', !payLink);
+  if (payLink) {
+    linkEl.href = payLink;
+    linkEl.textContent = `${t('pay_now')} · ${fmt(inv.total)} →`;
+  }
+
+  const bank = document.getElementById('cv-bank');
+  bank.classList.toggle('hidden', !iban);
+  if (!iban) return;
+  try {
+    drawEpcQr(document.getElementById('cv-qr-canvas'),
+      buildEpcString(iban, inv.freelancerName || '', inv.total, inv.id), 280);
+  } catch { document.getElementById('cv-qr-canvas').classList.add('hidden'); }
+
+  const rows = [
+    ['IBAN', iban.replace(/(.{4})/g, '$1 ').trim(), iban],
+    [t('pdf_benef'), inv.freelancerName, inv.freelancerName],
+    [t('pay_amount'), fmt(inv.total), parseFloat(inv.total || 0).toFixed(2)],
+    [t('pdf_ref'), inv.id, inv.id],
+  ].filter(r => r[2]);
+  const box = document.getElementById('cv-bank-rows');
+  box.innerHTML = '';
+  rows.forEach(([label, shown, copyVal]) => {
+    const row = document.createElement('div');
+    row.className = 'flex items-center justify-between gap-3 px-4 py-3';
+    row.innerHTML = `<div class="min-w-0"><div class="pay-lbl text-[10px] text-gray-400 uppercase font-bold tracking-wider"></div>
+      <div class="pay-val font-mono text-sm font-bold text-gray-900 truncate"></div></div>
+      <button type="button" class="flex-shrink-0 text-[11px] font-black uppercase px-3 py-1.5 rounded-lg bg-white border border-gray-200 text-gray-600 active:scale-95 transition"></button>`;
+    row.querySelector('.pay-lbl').textContent = label;
+    row.querySelector('.pay-val').textContent = shown;
+    const b = row.querySelector('button');
+    b.textContent = t('pay_copy');
+    b.onclick = () => navigator.clipboard.writeText(copyVal).then(() => {
+      b.textContent = `✓ ${t('pay_copied')}`;
+      setTimeout(() => { b.textContent = t('pay_copy'); }, 1500);
+    });
+    box.appendChild(row);
+  });
 }
 
 // ── DASHBOARD ─────────────────────────────────────────────────────────
@@ -2366,23 +2472,32 @@ function exportPDF(id) {
   if (!inv || !window.jspdf) { toast('⚠️', 'jsPDF not loaded'); return; }
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-  const W = 210, M = 18;
+  const W = 210, H = 297, M = 18;
   let y = M;
 
-  doc.setFillColor(10,10,10);
-  doc.rect(0,0,W,46,'F');
-  doc.setFontSize(20); doc.setFont('helvetica','bold');
-  doc.setTextColor(255,255,255); doc.text('DU', M, y+11);
-  doc.setTextColor(255,204,0);   doc.text('FATTUR', M+12, y+11);
-  doc.setFontSize(9);  doc.setFont('helvetica','normal');
-  doc.setTextColor(160,160,160); doc.text(t('pdf_type'), W-M, y+7, {align:'right'});
-  doc.setFontSize(13); doc.setFont('helvetica','bold');
-  doc.setTextColor(255,255,255); doc.text(inv.id, W-M, y+15, {align:'right'});
+  let themeKey = DEFAULT_THEME;
+  try { themeKey = localStorage.getItem('df_theme') || DEFAULT_THEME; } catch(_) {}
+  const theme = THEMES.find(th => th.key === themeKey) || THEMES[0];
+  const accent = theme.rgb.split(',').map(Number);
+  const accentFg = theme.fg === '#fff' ? [255,255,255] : [0,0,0];
+  const sender = S.settings.name || S.settings.email || 'Freelancer';
+
+  // Slim header: the freelancer's own name, document type and number
+  doc.setFillColor(...accent);
+  doc.rect(0, 0, W, 3, 'F');
+  doc.setFontSize(18); doc.setFont('helvetica','bold'); doc.setTextColor(15,15,15);
+  doc.text(doc.splitTextToSize(sender, 110)[0], M, 20);
+  doc.setFontSize(8); doc.setFont('helvetica','bold'); doc.setTextColor(130,130,130);
+  doc.text(t('pdf_type'), W-M, 14, {align:'right'});
+  doc.setFontSize(13); doc.setTextColor(15,15,15);
+  doc.text(inv.id, W-M, 20, {align:'right'});
+  doc.setDrawColor(230,230,230); doc.setLineWidth(0.3);
+  doc.line(M, 27, W-M, 27);
 
   const code = S.settings.country || 'IT';
   const ctry = COUNTRIES[code] || COUNTRIES.IT;
 
-  y = 54;
+  y = 36;
   doc.setFontSize(7.5); doc.setFont('helvetica','bold'); doc.setTextColor(140,140,140);
   doc.text(t('pdf_from'), M, y); doc.text(t('pdf_to'), 112, y);
   y += 5;
@@ -2469,7 +2584,7 @@ function exportPDF(id) {
     if (parseFloat(inv.vatAmount) > 0) {
       doc.setFillColor(252,252,252);
       doc.rect(M, y-2, W-2*M, 8, 'F');
-      doc.text(`${t('pdf_vat_amt')} (${inv.taxName||ctry.taxName} ${inv.vatRate}%)`, M+4, y+3);
+      doc.text(`${inv.taxName||ctry.taxName} ${inv.vatRate}%`, M+4, y+3);
       doc.text(`${sym()} ${parseFloat(inv.vatAmount).toFixed(2)}`, W-M-3, y+3, {align:'right'});
       y += 8;
     }
@@ -2485,33 +2600,69 @@ function exportPDF(id) {
     y += 2;
   }
 
-  doc.setFillColor(10,10,10);
-  doc.rect(M, y-2, W-2*M, 12, 'F');
-  doc.setFontSize(10); doc.setFont('helvetica','bold');
-  doc.setTextColor(255,255,255); doc.text(t('pdf_tot'), M+4, y+6);
-  doc.setTextColor(255,204,0);   doc.text(`${sym()} ${parseFloat(inv.total).toFixed(2)}`, W-M-3, y+6, {align:'right'});
+  doc.setFillColor(...accent);
+  doc.roundedRect(M, y-2, W-2*M, 12, 2, 2, 'F');
+  doc.setFontSize(10); doc.setFont('helvetica','bold'); doc.setTextColor(...accentFg);
+  doc.text(t('pdf_tot'), M+4, y+6);
+  doc.setFontSize(12);
+  doc.text(`${sym()} ${parseFloat(inv.total).toFixed(2)}`, W-M-4, y+6, {align:'right'});
   y += 18;
 
   if (inv.notes) {
+    const noteLines = doc.splitTextToSize(inv.notes, W-2*M);
     doc.setFontSize(7.5); doc.setFont('helvetica','bold'); doc.setTextColor(140,140,140);
     doc.text(t('pdf_notes'), M, y); y += 4;
     doc.setFont('helvetica','normal'); doc.setTextColor(90,90,90); doc.setFontSize(8);
-    doc.text(doc.splitTextToSize(inv.notes, W-2*M), M, y);
+    doc.text(noteLines, M, y);
+    y += noteLines.length * 3.6 + 6;
   }
 
-  // SEPA payment QR (bottom-right, only if IBAN set)
-  if (S.settings.iban) {
-    sepaQrDataUrl(S.settings.iban, S.settings.name || '', inv.total, inv.id).then(dataUrl => {
-      if (!dataUrl) { doc.save(`${inv.id}.pdf`); toast('📄', t('t_pdf')); return; }
-      const qSize = 32;
-      const qX = W - M - qSize;
-      const qY = 255;
-      doc.addImage(dataUrl, 'PNG', qX, qY, qSize, qSize);
-      doc.setFontSize(6); doc.setFont('helvetica','bold'); doc.setTextColor(140,140,140);
-      doc.text('Scan to pay (SEPA)', qX + qSize/2, qY + qSize + 3, {align:'center'});
-      doc.save(`${inv.id}.pdf`); toast('📄', t('t_pdf'));
-    }).catch(() => { doc.save(`${inv.id}.pdf`); toast('📄', t('t_pdf')); });
-    return;
+  // Payment box: bank details + SEPA QR, plus an optional one-tap link
+  const iban = (S.settings.iban || '').replace(/\s/g, '').toUpperCase();
+  const payLink = safeHttpsUrl(inv.payLink);
+  if ((iban || payLink) && inv.status !== 'paid') {
+    const boxH = iban ? 42 : 16;
+    if (y + boxH > H - 16) { doc.addPage(); y = M; }
+    doc.setFillColor(246,247,249);
+    doc.roundedRect(M, y, W-2*M, boxH, 3, 3, 'F');
+    let ty = y + 8;
+    doc.setFontSize(7.5); doc.setFont('helvetica','bold'); doc.setTextColor(140,140,140);
+    doc.text(t('pdf_pay'), M+5, ty);
+    ty += 6;
+    if (iban) {
+      const rows = [
+        ['IBAN', iban.replace(/(.{4})/g, '$1 ').trim()],
+        [t('pdf_benef'), sender],
+        [t('pay_amount'), `${sym()} ${parseFloat(inv.total).toFixed(2)}`],
+        [t('pdf_ref'), inv.id],
+      ];
+      rows.forEach(([k, v]) => {
+        doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(120,120,120);
+        doc.text(k, M+5, ty);
+        doc.setFont('helvetica','bold'); doc.setTextColor(20,20,20);
+        doc.text(String(v), M+32, ty);
+        ty += 5;
+      });
+      const qr = sepaQrDataUrl(iban, sender, inv.total, inv.id);
+      if (qr) {
+        const q = 32;
+        doc.addImage(qr, 'PNG', W-M-q-4, y+5, q, q);
+        doc.setFontSize(6); doc.setFont('helvetica','normal'); doc.setTextColor(140,140,140);
+        doc.text(doc.splitTextToSize(t('pay_scan'), 60), W-M-q-8, y+boxH-6, {align:'right'});
+      }
+    }
+    if (payLink) {
+      doc.setFontSize(9); doc.setFont('helvetica','bold'); doc.setTextColor(...(theme.key === 'white' ? [20,20,20] : accent));
+      doc.textWithLink(t('pdf_paylink'), M+5, iban ? ty + 1 : ty, { url: payLink });
+    }
+    y += boxH + 6;
+  }
+
+  const pages = doc.getNumberOfPages();
+  for (let p = 1; p <= pages; p++) {
+    doc.setPage(p);
+    doc.setFontSize(6.5); doc.setFont('helvetica','normal'); doc.setTextColor(170,170,170);
+    doc.text('dufattur.nl', W/2, H-8, {align:'center'});
   }
 
   doc.save(`${inv.id}.pdf`);
@@ -2875,14 +3026,7 @@ function drawEpcQr(canvas, data, px) {
   return canvas;
 }
 
-function renderSepaQr(canvasId, iban, name, amount, ref) {
-  try {
-    drawEpcQr(document.getElementById(canvasId), buildEpcString(iban, name, amount, ref), 280);
-    return Promise.resolve();
-  } catch (e) { return Promise.reject(e); }
-}
-
-async function sepaQrDataUrl(iban, name, amount, ref) {
+function sepaQrDataUrl(iban, name, amount, ref) {
   try {
     return drawEpcQr(document.createElement('canvas'), buildEpcString(iban, name, amount, ref), 400).toDataURL('image/png');
   } catch { return null; }
