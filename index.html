@@ -9,7 +9,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.105.4/dist/umd/supabase.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
     <script>
         tailwind.config = {
             theme: {
@@ -2850,26 +2850,41 @@ function emailModalCopy() {
 }
 
 // ── SEPA EPC QR CODE ─────────────────────────────────────────────────
+// EPC069-12 v002: free-text reference goes in the unstructured line (11); line 10 is for RF references only.
 function buildEpcString(iban, name, amount, ref) {
-  const cleanIban = iban.replace(/\s/g, '');
-  return ['BCD','002','1','SCT','', (name||'').substring(0,70), cleanIban,
-    `EUR${parseFloat(amount).toFixed(2)}`, '', ref||'', ''].join('\n');
+  return ['BCD','002','1','SCT','', (name||'').substring(0,70), iban.replace(/\s/g, '').toUpperCase(),
+    `EUR${parseFloat(amount).toFixed(2)}`, '', '', (ref||'').substring(0,140)].join('\n');
+}
+
+function drawEpcQr(canvas, data, px) {
+  if (typeof qrcode !== 'function') throw new Error('QR library not loaded');
+  qrcode.stringToBytes = qrcode.stringToBytesFuncs['UTF-8'];
+  const qr = qrcode(0, 'M');
+  qr.addData(data, 'Byte');
+  qr.make();
+  const n = qr.getModuleCount(), quiet = 4;
+  const cell = Math.max(2, Math.floor(px / (n + 2 * quiet)));
+  canvas.width = canvas.height = cell * (n + 2 * quiet);
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = '#000';
+  for (let r = 0; r < n; r++)
+    for (let c = 0; c < n; c++)
+      if (qr.isDark(r, c)) ctx.fillRect((c + quiet) * cell, (r + quiet) * cell, cell, cell);
+  return canvas;
 }
 
 function renderSepaQr(canvasId, iban, name, amount, ref) {
-  const canvas = document.getElementById(canvasId);
-  if (!canvas || !window.QRCode) return Promise.reject('no QRCode lib');
-  return QRCode.toCanvas(canvas, buildEpcString(iban, name, amount, ref), {
-    width: 140, margin: 1, color: { dark: '#000000', light: '#ffffff' }
-  });
+  try {
+    drawEpcQr(document.getElementById(canvasId), buildEpcString(iban, name, amount, ref), 280);
+    return Promise.resolve();
+  } catch (e) { return Promise.reject(e); }
 }
 
 async function sepaQrDataUrl(iban, name, amount, ref) {
-  if (!window.QRCode) return null;
   try {
-    return await QRCode.toDataURL(buildEpcString(iban, name, amount, ref), {
-      width: 120, margin: 1, color: { dark: '#000000', light: '#ffffff' }
-    });
+    return drawEpcQr(document.createElement('canvas'), buildEpcString(iban, name, amount, ref), 400).toDataURL('image/png');
   } catch { return null; }
 }
 
