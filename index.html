@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DuFattur | The Freelance OS</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230a0a0a'/%3E%3Ctext x='32' y='43' font-family='Arial,Helvetica,sans-serif' font-weight='900' font-size='30' text-anchor='middle' fill='%23ffffff'%3ED%3Ctspan fill='%233b82f6'%3EF%3C/tspan%3E%3C/text%3E%3C/svg%3E">
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;700;800;900&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -709,6 +710,10 @@ grant execute on function public.get_logo_by_token(uuid) to anon, authenticated;
             <div class="w-8 h-8 border-2 border-gray-700 border-t-accent rounded-full spinner mx-auto mb-3"></div>
             <div class="text-gray-600 text-xs font-bold">Loading invoice...</div>
         </div>
+        <a href="https://dufattur.nl" target="_blank" rel="noopener" class="block w-fit mx-auto mt-6 text-[11px] text-gray-500 hover:text-gray-300 transition">
+            <span data-i18n="made_with">Made with</span> <span class="font-black text-white tracking-tight">DU</span><span class="font-black text-accent tracking-tight">FATTUR</span>
+        </a>
+
         <div id="cv-error" class="hidden text-center mt-8">
             <div class="text-4xl mb-3">❌</div>
             <div class="text-red-400 font-bold">Invoice not found or link expired.</div>
@@ -978,7 +983,7 @@ const L = {
     an_earned:'Totale Incassato', an_out:'Da Incassare', an_avg:'Fattura Media',
     an_chart:'Entrate Mensili (ultimi 12 mesi)', an_top:'Top Clienti',
     set_h1:'Impostazioni', set_sub:'Profilo freelance e preferenze dell\'app.',
-    set_logo:'Logo', btn_logo_up:'Carica logo', btn_logo_rm:'Rimuovi', hint_logo:'Opzionale. Appare sui PDF e sulla pagina del cliente.', t_logo_big:'Immagine troppo grande (max 5 MB).', t_logo_db:'Logo non salvato: esegui l\'aggiornamento SQL del database.',
+    made_with:'Creato con', set_logo:'Logo', btn_logo_up:'Carica logo', btn_logo_rm:'Rimuovi', hint_logo:'Opzionale. Appare sui PDF e sulla pagina del cliente.', t_logo_big:'Immagine troppo grande (max 5 MB).', t_logo_db:'Logo non salvato: esegui l\'aggiornamento SQL del database.',
     set_prof:'Profilo Freelance', set_name:'Nome / Ragione Sociale', set_email:'Email',
     set_vat:'P.IVA / VAT', set_addr:'Indirizzo',
     ph_sname:'Il tuo nome o azienda', ph_saddr:'Via Roma 1, Milano',
@@ -1049,7 +1054,7 @@ const L = {
     an_earned:'Total Earned', an_out:'Outstanding', an_avg:'Avg Invoice',
     an_chart:'Monthly Revenue (last 12 months)', an_top:'Top Clients',
     set_h1:'Settings', set_sub:'Your freelance profile and app preferences.',
-    set_logo:'Logo', btn_logo_up:'Upload logo', btn_logo_rm:'Remove', hint_logo:'Optional. Shown on your PDFs and client page.', t_logo_big:'Image too large (max 5 MB).', t_logo_db:'Logo not saved: run the database SQL update first.',
+    made_with:'Made with', set_logo:'Logo', btn_logo_up:'Upload logo', btn_logo_rm:'Remove', hint_logo:'Optional. Shown on your PDFs and client page.', t_logo_big:'Image too large (max 5 MB).', t_logo_db:'Logo not saved: run the database SQL update first.',
     set_prof:'Freelance Profile', set_name:'Name / Business Name', set_email:'Email',
     set_vat:'VAT Number', set_addr:'Address',
     ph_sname:'Your name or company', ph_saddr:'123 Main St, London',
@@ -1120,7 +1125,7 @@ const L = {
     an_earned:'Totaal Verdiend', an_out:'Openstaand', an_avg:'Gem. Factuur',
     an_chart:'Maandelijkse Omzet (laatste 12 maanden)', an_top:'Top Klanten',
     set_h1:'Instellingen', set_sub:'Uw freelanceprofiel en app-voorkeuren.',
-    set_logo:'Logo', btn_logo_up:'Logo uploaden', btn_logo_rm:'Verwijderen', hint_logo:'Optioneel. Zichtbaar op je pdf\'s en klantpagina.', t_logo_big:'Afbeelding te groot (max 5 MB).', t_logo_db:'Logo niet opgeslagen: voer eerst de SQL-update van de database uit.',
+    made_with:'Gemaakt met', set_logo:'Logo', btn_logo_up:'Logo uploaden', btn_logo_rm:'Verwijderen', hint_logo:'Optioneel. Zichtbaar op je pdf\'s en klantpagina.', t_logo_big:'Afbeelding te groot (max 5 MB).', t_logo_db:'Logo niet opgeslagen: voer eerst de SQL-update van de database uit.',
     set_prof:'Freelanceprofiel', set_name:'Naam / Bedrijfsnaam', set_email:'E-mail',
     set_vat:'BTW-nummer', set_addr:'Adres',
     ph_sname:'Uw naam of bedrijf', ph_saddr:'Straatnaam 1, Amsterdam',
@@ -1191,7 +1196,7 @@ const L = {
     an_earned:'Gesamt Verdient', an_out:'Offene Posten', an_avg:'Ø Rechnung',
     an_chart:'Monatlicher Umsatz (letzte 12 Monate)', an_top:'Top Kunden',
     set_h1:'Einstellungen', set_sub:'Ihr Freelancer-Profil und App-Einstellungen.',
-    set_logo:'Logo', btn_logo_up:'Logo hochladen', btn_logo_rm:'Entfernen', hint_logo:'Optional. Erscheint auf PDFs und der Kundenseite.', t_logo_big:'Bild zu groß (max. 5 MB).', t_logo_db:'Logo nicht gespeichert: zuerst das SQL-Update der Datenbank ausführen.',
+    made_with:'Erstellt mit', set_logo:'Logo', btn_logo_up:'Logo hochladen', btn_logo_rm:'Entfernen', hint_logo:'Optional. Erscheint auf PDFs und der Kundenseite.', t_logo_big:'Bild zu groß (max. 5 MB).', t_logo_db:'Logo nicht gespeichert: zuerst das SQL-Update der Datenbank ausführen.',
     set_prof:'Freelancer-Profil', set_name:'Name / Firmenname', set_email:'E-Mail',
     set_vat:'USt-IdNr.', set_addr:'Adresse',
     ph_sname:'Ihr Name oder Unternehmen', ph_saddr:'Musterstraße 1, Berlin',
@@ -2202,14 +2207,15 @@ function renderClientPay(inv) {
     const row = document.createElement('div');
     row.className = 'flex items-center justify-between gap-3 px-4 py-3';
     row.innerHTML = `<div class="min-w-0"><div class="pay-lbl text-[10px] text-gray-400 uppercase font-bold tracking-wider"></div>
-      <div class="pay-val font-mono text-sm font-bold text-gray-900 truncate"></div></div>
-      <button type="button" class="flex-shrink-0 text-[11px] font-black uppercase px-3 py-1.5 rounded-lg bg-white border border-gray-200 text-gray-600 active:scale-95 transition"></button>`;
+      <div class="pay-val font-mono text-[13px] font-bold text-gray-900 break-all"></div></div>
+      <button type="button" class="flex-shrink-0 min-w-[78px] text-center text-[11px] font-black uppercase px-3 py-1.5 rounded-lg bg-white border border-gray-200 text-gray-600 active:scale-95 transition"></button>`;
     row.querySelector('.pay-lbl').textContent = label;
     row.querySelector('.pay-val').textContent = shown;
     const b = row.querySelector('button');
     b.textContent = t('pay_copy');
     b.onclick = () => navigator.clipboard.writeText(copyVal).then(() => {
-      b.textContent = `✓ ${t('pay_copied')}`;
+      b.textContent = '✓';
+      b.title = t('pay_copied');
       setTimeout(() => { b.textContent = t('pay_copy'); }, 1500);
     });
     box.appendChild(row);
@@ -2717,10 +2723,21 @@ function exportPDF(id) {
   }
 
   const pages = doc.getNumberOfPages();
+  doc.setFontSize(6.5);
+  const madeW = doc.getStringUnitWidth(t('made_with') + ' ') * 6.5 / doc.internal.scaleFactor;
+  doc.setFont('helvetica','bold');
+  const duW = doc.getStringUnitWidth('DU') * 6.5 / doc.internal.scaleFactor;
+  const markW = madeW + duW + doc.getStringUnitWidth('FATTUR') * 6.5 / doc.internal.scaleFactor;
+  const mx = (W - markW) / 2, my = H - 8;
   for (let p = 1; p <= pages; p++) {
     doc.setPage(p);
-    doc.setFontSize(6.5); doc.setFont('helvetica','normal'); doc.setTextColor(170,170,170);
-    doc.text('dufattur.nl', W/2, H-8, {align:'center'});
+    doc.setFont('helvetica','normal'); doc.setTextColor(170,170,170);
+    doc.text(t('made_with') + ' ', mx, my);
+    doc.setFont('helvetica','bold'); doc.setTextColor(120,120,120);
+    doc.text('DU', mx + madeW, my);
+    doc.setTextColor(...(theme.key === 'white' ? [120,120,120] : accent));
+    doc.text('FATTUR', mx + madeW + duW, my);
+    doc.link(mx, my - 3, markW, 4, { url: 'https://dufattur.nl' });
   }
 
   doc.save(`${inv.id}.pdf`);
