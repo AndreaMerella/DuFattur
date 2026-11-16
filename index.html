@@ -9,6 +9,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.105.4/dist/umd/supabase.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
     <script>
         tailwind.config = {
             theme: {
@@ -282,8 +283,13 @@
   ritenuta_amount  numeric(12,2) default 0,
   tax_name         text,
   status           text          not null default 'pending' check (status in ('pending','approved','paid')),
+  freelancer_iban  text,
+  freelancer_name  text,
   created_at       timestamptz   not null default now()
 );
+-- if upgrading an existing table, run:
+-- alter table public.invoices add column if not exists freelancer_iban text;
+-- alter table public.invoices add column if not exists freelancer_name text;
 
 create table if not exists public.settings (
   user_id          uuid          primary key references auth.users(id) on delete cascade,
@@ -650,6 +656,12 @@ create policy "owner_settings" on public.settings for all to authenticated
             </div>
 
             <div class="px-7 py-6">
+                <!-- SEPA payment QR (shown only when IBAN is available) -->
+                <div id="cv-qr-wrap" class="hidden mb-5 flex flex-col items-center gap-2">
+                    <div class="text-[10px] text-gray-400 uppercase font-bold tracking-widest" id="cv-qr-lbl">Pay by bank transfer</div>
+                    <canvas id="cv-qr-canvas" class="rounded-xl" style="width:140px;height:140px;"></canvas>
+                    <div class="text-[10px] text-gray-400 text-center" id="cv-qr-iban"></div>
+                </div>
                 <button id="btn-approve" class="w-full bg-black text-white py-4 rounded-2xl font-black text-base transition hover:bg-gray-800 active:scale-95">
                     <span data-i18n="cv_approve">APPROVA E CONFERMA</span>
                 </button>
@@ -1665,6 +1677,8 @@ function dbToInv(r) {
     ritenuteAmount: parseFloat(r.ritenuta_amount) || 0,
     taxName:        r.tax_name         || '',
     status:         r.status,
+    freelancerIban: r.freelancer_iban  || '',
+    freelancerName: r.freelancer_name  || '',
     createdAt:      r.created_at,
   };
 }
@@ -1686,6 +1700,8 @@ function invToDb(inv) {
     ritenuta_amount:  parseFloat(inv.ritenuteAmount)|| 0,
     tax_name:         inv.taxName          || null,
     status:           inv.status,
+    freelancer_iban:  S.settings.iban      || null,
+    freelancer_name:  S.settings.name      || null,
     created_at:       inv.createdAt,
   };
 }
@@ -2016,6 +2032,17 @@ async function loadClientView(token) {
 
     loadEl.classList.add('hidden');
     if (card) card.classList.remove('hidden');
+
+    // SEPA QR — rendered after card is visible so canvas has dimensions
+    if (inv.iban || inv.freelancerIban) {
+      const iban  = inv.iban || inv.freelancerIban || '';
+      const name  = inv.freelancerName || '';
+      const total = parseFloat(inv.total || 0).toFixed(2);
+      renderSepaQr('cv-qr-canvas', iban, name, total, inv.id).then(() => {
+        document.getElementById('cv-qr-wrap').classList.remove('hidden');
+        document.getElementById('cv-qr-iban').textContent = iban;
+      }).catch(() => {});
+    }
 
   } catch (err) {
     loadEl.classList.add('hidden');
@@ -2468,6 +2495,21 @@ function exportPDF(id) {
     doc.text(doc.splitTextToSize(inv.notes, W-2*M), M, y);
   }
 
+  // SEPA payment QR (bottom-right, only if IBAN set)
+  if (S.settings.iban) {
+    sepaQrDataUrl(S.settings.iban, S.settings.name || '', inv.total, inv.id).then(dataUrl => {
+      if (!dataUrl) { doc.save(`${inv.id}.pdf`); toast('📄', t('t_pdf')); return; }
+      const qSize = 32;
+      const qX = W - M - qSize;
+      const qY = 255;
+      doc.addImage(dataUrl, 'PNG', qX, qY, qSize, qSize);
+      doc.setFontSize(6); doc.setFont('helvetica','bold'); doc.setTextColor(140,140,140);
+      doc.text('Scan to pay (SEPA)', qX + qSize/2, qY + qSize + 3, {align:'center'});
+      doc.save(`${inv.id}.pdf`); toast('📄', t('t_pdf'));
+    }).catch(() => { doc.save(`${inv.id}.pdf`); toast('📄', t('t_pdf')); });
+    return;
+  }
+
   doc.save(`${inv.id}.pdf`);
   toast('📄', t('t_pdf'));
 }
@@ -2801,6 +2843,30 @@ function emailModalOpen() {
 
 function emailModalCopy() {
   navigator.clipboard.writeText(_emailBody).then(() => toast('📋', t('t_email_copied')));
+}
+
+// ── SEPA EPC QR CODE ─────────────────────────────────────────────────
+function buildEpcString(iban, name, amount, ref) {
+  const cleanIban = iban.replace(/\s/g, '');
+  return ['BCD','002','1','SCT','', (name||'').substring(0,70), cleanIban,
+    `EUR${parseFloat(amount).toFixed(2)}`, '', ref||'', ''].join('\n');
+}
+
+function renderSepaQr(canvasId, iban, name, amount, ref) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas || !window.QRCode) return Promise.reject('no QRCode lib');
+  return QRCode.toCanvas(canvas, buildEpcString(iban, name, amount, ref), {
+    width: 140, margin: 1, color: { dark: '#000000', light: '#ffffff' }
+  });
+}
+
+async function sepaQrDataUrl(iban, name, amount, ref) {
+  if (!window.QRCode) return null;
+  try {
+    return await QRCode.toDataURL(buildEpcString(iban, name, amount, ref), {
+      width: 120, margin: 1, color: { dark: '#000000', light: '#ffffff' }
+    });
+  } catch { return null; }
 }
 
 // ── BOOT ──────────────────────────────────────────────────────────────
