@@ -213,11 +213,11 @@
             <div class="px-6 py-5 space-y-4">
                 <div>
                     <div class="text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-1" id="em-to-lbl">To</div>
-                    <div class="text-sm font-bold text-accent" id="em-to">—</div>
+                    <div class="text-sm font-bold text-accent" id="em-to">-</div>
                 </div>
                 <div>
                     <div class="text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-1" id="em-subj-lbl">Subject</div>
-                    <div class="text-sm font-bold text-white" id="em-subject">—</div>
+                    <div class="text-sm font-bold text-white" id="em-subject">-</div>
                 </div>
                 <div>
                     <div class="text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-2" id="em-body-lbl">Message</div>
@@ -240,7 +240,7 @@
             </div>
 
             <div class="card neon mb-5" style="background:#0e0e0e;border-color:#222;">
-                <h2 class="font-black text-white mb-6 text-base">Setup — 3 steps</h2>
+                <h2 class="font-black text-white mb-6 text-base">Setup: 3 steps</h2>
 
                 <!-- Step 1 -->
                 <div class="flex gap-4 mb-5">
@@ -923,7 +923,7 @@ grant execute on function public.approve_invoice(uuid) to anon, authenticated;</
 <!-- ═══════════════════ APP LOGIC ═══════════════════ -->
 <script>
 // ─────────────────────────────────────────────────────────────────────
-// DUFATTUR v3.0  |  The Freelance OS — Supabase Edition
+// DUFATTUR v3.0  |  The Freelance OS - Supabase Edition
 // ─────────────────────────────────────────────────────────────────────
 
 // ── I18N ──────────────────────────────────────────────────────────────
@@ -974,7 +974,7 @@ const L = {
     t_pdf:'PDF esportato!', t_warn:'Aggiungi almeno una voce!', t_copied:'Link copiato!',
     t_ubl:'UBL esportato!', t_email_copied:'Testo copiato!',
     pay_h:'Paga', pay_now:'Paga ora', pay_copy:'Copia', pay_copied:'Copiato', pay_amount:'Importo',
-    pay_scan:'Inquadra il QR con l\'app della tua banca: importo, IBAN e causale si compilano da soli.',
+    pay_scan:'Apri l\'app della tua banca e inquadra il codice.',
     lbl_paylink:'Link di pagamento (opzionale)', ph_paylink:'https://tikkie.me/…',
     hint_paylink:'Tikkie, ING betaalverzoek, bunq.me, Revolut, PayPal… Il cliente vede un pulsante "Paga ora".',
     t_badlink:'Il link di pagamento deve iniziare con https://',
@@ -1044,7 +1044,7 @@ const L = {
     t_pdf:'PDF exported!', t_warn:'Add at least one line item!', t_copied:'Link copied!',
     t_ubl:'UBL exported!', t_email_copied:'Text copied!',
     pay_h:'Pay', pay_now:'Pay now', pay_copy:'Copy', pay_copied:'Copied', pay_amount:'Amount',
-    pay_scan:'Scan with your banking app — amount, IBAN and reference fill in automatically.',
+    pay_scan:'Open your banking app and scan the code.',
     lbl_paylink:'Payment link (optional)', ph_paylink:'https://tikkie.me/…',
     hint_paylink:'Tikkie, ING payment request, bunq.me, Revolut, PayPal… Your client gets a "Pay now" button.',
     t_badlink:'The payment link must start with https://',
@@ -1114,7 +1114,7 @@ const L = {
     t_pdf:'PDF geëxporteerd!', t_warn:'Voeg minimaal één regelitem toe!', t_copied:'Link gekopieerd!',
     t_ubl:'UBL geëxporteerd!', t_email_copied:'Tekst gekopieerd!',
     pay_h:'Betalen', pay_now:'Nu betalen', pay_copy:'Kopieer', pay_copied:'Gekopieerd', pay_amount:'Bedrag',
-    pay_scan:'Scan met je bank-app — bedrag, IBAN en kenmerk worden automatisch ingevuld.',
+    pay_scan:'Open je bank-app en scan de code.',
     lbl_paylink:'Betaallink (optioneel)', ph_paylink:'https://tikkie.me/…',
     hint_paylink:'Tikkie, ING betaalverzoek, bunq.me, Revolut, PayPal… Je klant krijgt een "Nu betalen"-knop.',
     t_badlink:'De betaallink moet beginnen met https://',
@@ -1184,7 +1184,7 @@ const L = {
     t_pdf:'PDF exportiert!', t_warn:'Mindestens eine Position hinzufügen!', t_copied:'Link kopiert!',
     t_ubl:'UBL exportiert!', t_email_copied:'Text kopiert!',
     pay_h:'Bezahlen', pay_now:'Jetzt bezahlen', pay_copy:'Kopieren', pay_copied:'Kopiert', pay_amount:'Betrag',
-    pay_scan:'Mit der Banking-App scannen — Betrag, IBAN und Verwendungszweck werden automatisch ausgefüllt.',
+    pay_scan:'Banking-App öffnen und Code scannen.',
     lbl_paylink:'Zahlungslink (optional)', ph_paylink:'https://paypal.me/…',
     hint_paylink:'PayPal, Revolut, bunq.me, Tikkie… Ihr Kunde erhält einen "Jetzt bezahlen"-Button.',
     t_badlink:'Der Zahlungslink muss mit https:// beginnen',
@@ -1507,7 +1507,7 @@ function showView(v, opts = {}) {
 // ── SUPABASE CONFIG ───────────────────────────────────────────────────
 // Paste your credentials here once → anyone can open the app, each user
 // gets fully isolated data via Row Level Security.
-// The anon key is SAFE to be public — Supabase designed it that way.
+// The anon key is SAFE to be public - Supabase designed it that way.
 const HARDCODED = {
   url: 'https://vkxtdaalzznmwcfuxuyp.supabase.co',
   key: 'sb_publishable_66gbkXwBu2gMHR-JfQ9gDQ_NTekCZqi'
@@ -1619,7 +1619,7 @@ async function boot() {
 
   initClient(cfg.url, cfg.key);
 
-  // Public client invoice view (?token=xxx) — no auth needed
+  // Public client invoice view (?token=xxx) - no auth needed
   const urlParams = new URLSearchParams(window.location.search);
   const token = urlParams.get('token');
   if (token) {
@@ -1639,7 +1639,7 @@ async function boot() {
     const { data: { session } } = await _sb.auth.getSession();
     if (session) {
       USER = session.user;
-      // Safe to clean URL now — tokens already consumed
+      // Safe to clean URL now - tokens already consumed
       history.replaceState(null, '', window.location.pathname);
       await loadApp();
       return;
@@ -1648,7 +1648,7 @@ async function boot() {
     console.error('Boot error:', err);
   }
 
-  // No session — listen in case onAuthStateChange fires (PKCE code exchange)
+  // No session - listen in case onAuthStateChange fires (PKCE code exchange)
   _sb.auth.onAuthStateChange(async (event, session) => {
     if (event === 'SIGNED_IN' && session) {
       USER = session.user;
@@ -1784,7 +1784,7 @@ function restoreTimerState() {
     S.timer.on      = false; // will be set true by startTimerInterval
     document.getElementById('timer-rate-in').value = saved.rate;
     startTimerInterval(saved.rate);
-    toast('⏱️', `Timer restored — ${fmt(S.timer.earn)} earned`);
+    toast('⏱️', `Timer restored: ${fmt(S.timer.earn)} earned`);
   } catch {}
 }
 
@@ -2018,7 +2018,7 @@ function resetInvForm() {
   addItem();
 }
 
-// ── CLIENT VIEW (PUBLIC — no auth) ────────────────────────────────────
+// ── CLIENT VIEW (PUBLIC - no auth) ────────────────────────────────────
 async function loadClientView(token) {
   const card    = document.querySelector('#view-client > div');
   const loadEl  = document.getElementById('cv-loading');
@@ -2517,7 +2517,7 @@ function exportPDF(id) {
   // Legal notice for special regimes
   const legalMap = {
     kleinunternehmer: {
-      it: 'Operazione effettuata ai sensi dell\'art. §19 UStG — IVA non applicata.',
+      it: 'Operazione effettuata ai sensi dell\'art. §19 UStG. IVA non applicata.',
       en: 'Pursuant to §19 UStG (German Small Business Regulation), no VAT charged.',
       de: 'Gemäß §19 UStG wird keine Umsatzsteuer berechnet.'
     },
@@ -2830,19 +2830,19 @@ function remindInvoice(id) {
 
   const templates = {
     it: {
-      subj: `Sollecito di pagamento — ${inv.id}`,
+      subj: `Sollecito di pagamento ${inv.id}`,
       body: `Gentile ${client},\n\nTi scrivo per ricordarti che la proforma n. ${inv.id} di ${amount}${due ? ` (scaduta il ${due})` : ''} risulta ancora non saldata.\n\nPuoi consultarla qui:\n${link}${iban ? `\n\nCoordinate bancarie: IBAN ${iban}` : ''}\n\nGrazie per la collaborazione,\n${sender}`,
     },
     en: {
-      subj: `Payment reminder — ${inv.id}`,
+      subj: `Payment reminder ${inv.id}`,
       body: `Hi ${client},\n\nThis is a friendly reminder that invoice ${inv.id} for ${amount}${due ? ` (due ${due})` : ''} is still outstanding.\n\nYou can view it here:\n${link}${iban ? `\n\nPayment details: IBAN ${iban}` : ''}\n\nThank you,\n${sender}`,
     },
     nl: {
-      subj: `Betalingsherinnering — ${inv.id}`,
+      subj: `Betalingsherinnering ${inv.id}`,
       body: `Beste ${client},\n\nWij willen u er vriendelijk aan herinneren dat factuur ${inv.id} van ${amount}${due ? ` (vervallen op ${due})` : ''} nog niet is betaald.\n\nU kunt de factuur hier bekijken:\n${link}${iban ? `\n\nBetaalgegevens: IBAN ${iban}` : ''}\n\nMet vriendelijke groet,\n${sender}`,
     },
     de: {
-      subj: `Zahlungserinnerung — ${inv.id}`,
+      subj: `Zahlungserinnerung ${inv.id}`,
       body: `Sehr geehrte Damen und Herren,\n\nhiermit möchten wir Sie freundlich daran erinnern, dass Rechnung ${inv.id} über ${amount}${due ? ` (fällig am ${due})` : ''} noch offen ist.\n\nSie können die Rechnung hier einsehen:\n${link}${iban ? `\n\nBankverbindung: IBAN ${iban}` : ''}\n\nMit freundlichen Grüßen,\n${sender}`,
     },
   };
@@ -2859,7 +2859,7 @@ function remindInvoice(id) {
   document.getElementById('em-body-lbl').textContent = t('em_body_lbl');
   document.getElementById('em-open-lbl').textContent = t('em_open');
   document.getElementById('em-copy-lbl').textContent = t('em_copy');
-  document.getElementById('em-to').textContent       = _emailTo || '—';
+  document.getElementById('em-to').textContent       = _emailTo || '-';
   document.getElementById('em-subject').textContent  = _emailSubj;
   document.getElementById('em-body').textContent     = _emailBody;
   document.getElementById('email-modal').classList.remove('hidden');
@@ -2891,7 +2891,7 @@ function exportCSV() {
   a.href = url; a.download = `dufattur-${date}.csv`;
   document.body.appendChild(a); a.click();
   document.body.removeChild(a); URL.revokeObjectURL(url);
-  toast('📊', `CSV — ${S.invoices.length} ${S.invoices.length === 1 ? 'invoice' : 'invoices'}`);
+  toast('📊', `CSV: ${S.invoices.length} ${S.invoices.length === 1 ? 'invoice' : 'invoices'}`);
 }
 
 // ── SAVED CLIENTS AUTOCOMPLETE ────────────────────────────────────────
@@ -2953,19 +2953,19 @@ function emailInvoice(id) {
 
   const templates = {
     it: {
-      subj: `Proforma ${inv.id} — ${amount}`,
+      subj: `Proforma ${inv.id}: ${amount}`,
       body: `Gentile ${client},\n\nTi invio la proforma n. ${inv.id} per la tua revisione e approvazione.\n\nImporto: ${amount}${due ? `\nScadenza: ${due}` : ''}\n\nPuoi visualizzare e approvare online qui:\n${link}${iban ? `\n\nCoordinate bancarie: IBAN ${iban}` : ''}\n\nGrazie,\n${sender}`,
     },
     en: {
-      subj: `Invoice ${inv.id} — ${amount} due`,
+      subj: `Invoice ${inv.id}: ${amount} due`,
       body: `Hi ${client},\n\nPlease find invoice ${inv.id} for your review and approval.\n\nAmount due: ${amount}${due ? `\nDue date: ${due}` : ''}\n\nReview and approve it here:\n${link}${iban ? `\n\nPayment details: IBAN ${iban}` : ''}\n\nThank you,\n${sender}`,
     },
     nl: {
-      subj: `Factuur ${inv.id} — ${amount}`,
+      subj: `Factuur ${inv.id}: ${amount}`,
       body: `Beste ${client},\n\nHierbij ontvangt u factuur ${inv.id} ter beoordeling en goedkeuring.\n\nBedrag: ${amount}${due ? `\nVervaldatum: ${due}` : ''}\n\nU kunt de factuur online bekijken en goedkeuren via:\n${link}${iban ? `\n\nBetaalgegevens: IBAN ${iban}` : ''}\n\nMet vriendelijke groet,\n${sender}`,
     },
     de: {
-      subj: `Rechnung ${inv.id} — ${amount}`,
+      subj: `Rechnung ${inv.id}: ${amount}`,
       body: `Sehr geehrte Damen und Herren,\n\nanbei übersende ich Ihnen Rechnung ${inv.id} zur Prüfung und Bestätigung.\n\nBetrag: ${amount}${due ? `\nFälligkeitsdatum: ${due}` : ''}\n\nSie können die Rechnung hier einsehen und bestätigen:\n${link}${iban ? `\n\nBankverbindung: IBAN ${iban}` : ''}\n\nMit freundlichen Grüßen,\n${sender}`,
     },
   };
@@ -2982,7 +2982,7 @@ function emailInvoice(id) {
   document.getElementById('em-body-lbl').textContent = t('em_body_lbl');
   document.getElementById('em-open-lbl').textContent = t('em_open');
   document.getElementById('em-copy-lbl').textContent = t('em_copy');
-  document.getElementById('em-to').textContent      = _emailTo || '—';
+  document.getElementById('em-to').textContent      = _emailTo || '-';
   document.getElementById('em-subject').textContent = _emailSubj;
   document.getElementById('em-body').textContent    = _emailBody;
 
