@@ -313,6 +313,7 @@ create table if not exists public.settings (
   terms            text,
   due_days         integer       default 30,
   lang             text          default 'it',
+  logo             text,
   updated_at       timestamptz   default now()
 );
 
@@ -335,7 +336,14 @@ returns void language sql security definer set search_path = public
 as $$ update public.invoices set status = 'approved' where public_token = p_token and status = 'pending' $$;
 
 grant execute on function public.get_invoice_by_token(uuid) to anon, authenticated;
-grant execute on function public.approve_invoice(uuid) to anon, authenticated;</pre>
+grant execute on function public.approve_invoice(uuid) to anon, authenticated;
+
+create or replace function public.get_logo_by_token(p_token uuid)
+returns text language sql stable security definer set search_path = public
+as $$ select s.logo from public.settings s join public.invoices i on i.user_id = s.user_id
+      where i.public_token = p_token limit 1 $$;
+
+grant execute on function public.get_logo_by_token(uuid) to anon, authenticated;</pre>
                             <button onclick="copySql()" class="absolute top-2 right-2 bg-accent text-black text-[10px] font-black px-3 py-1.5 rounded-lg transition hover:bg-yellow-300">COPY</button>
                         </div>
                     </div>
@@ -624,6 +632,7 @@ grant execute on function public.approve_invoice(uuid) to anon, authenticated;</
         <div class="bg-white text-black rounded-[26px] shadow-2xl overflow-hidden">
 
             <div class="bg-gray-50 px-7 py-5 border-b border-gray-100 text-center">
+                <img id="cv-logo" class="hidden mx-auto mb-3 object-contain" style="max-height:52px;max-width:180px;" alt="">
                 <div class="text-[10px] text-gray-400 uppercase font-black tracking-widest mb-1" data-i18n="cv_lbl">Proforma</div>
                 <div class="text-sm font-black text-gray-800" id="cv-id">INV-2024-001</div>
             </div>
@@ -749,6 +758,22 @@ grant execute on function public.approve_invoice(uuid) to anon, authenticated;</
         <div class="flex flex-col gap-5">
             <div class="card" style="background:#0e0e0e;border-color:#1e1e1e;">
                 <h3 class="text-[10px] font-black uppercase tracking-widest text-gray-500 mb-5" data-i18n="set_prof">Profilo Freelance</h3>
+                <div class="mb-5 flex items-center gap-4">
+                    <div class="w-24 h-16 rounded-xl bg-white flex items-center justify-center overflow-hidden flex-shrink-0 border border-gray-800">
+                        <img id="s-logo-img" class="hidden max-w-full max-h-full object-contain p-1.5" alt="">
+                        <span id="s-logo-empty" class="text-[10px] font-bold text-gray-400 uppercase tracking-wider" data-i18n="set_logo">Logo</span>
+                    </div>
+                    <div class="min-w-0">
+                        <div class="flex gap-2 flex-wrap">
+                            <label class="btn-o text-[11px] py-2 px-3 cursor-pointer">
+                                <span data-i18n="btn_logo_up">Upload logo</span>
+                                <input type="file" id="s-logo-file" accept="image/png,image/jpeg,image/webp,image/svg+xml" class="hidden" onchange="onLogoFile(this)">
+                            </label>
+                            <button type="button" id="s-logo-rm" onclick="removeLogo()" class="hidden btn-o text-[11px] py-2 px-3 text-red-400 border-red-900 hover:border-red-600" data-i18n="btn_logo_rm">Remove</button>
+                        </div>
+                        <div class="text-[11px] text-gray-600 mt-2" data-i18n="hint_logo">Optional. Shown on your PDFs and client page.</div>
+                    </div>
+                </div>
                 <div class="mb-4">
                     <label class="block text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-2" data-i18n="set_country">Paese</label>
                     <select id="s-country" class="ifield" onchange="onCountryChange(true)">
@@ -953,6 +978,7 @@ const L = {
     an_earned:'Totale Incassato', an_out:'Da Incassare', an_avg:'Fattura Media',
     an_chart:'Entrate Mensili (ultimi 12 mesi)', an_top:'Top Clienti',
     set_h1:'Impostazioni', set_sub:'Profilo freelance e preferenze dell\'app.',
+    set_logo:'Logo', btn_logo_up:'Carica logo', btn_logo_rm:'Rimuovi', hint_logo:'Opzionale. Appare sui PDF e sulla pagina del cliente.', t_logo_big:'Immagine troppo grande (max 5 MB).', t_logo_db:'Logo non salvato: esegui l\'aggiornamento SQL del database.',
     set_prof:'Profilo Freelance', set_name:'Nome / Ragione Sociale', set_email:'Email',
     set_vat:'P.IVA / VAT', set_addr:'Indirizzo',
     ph_sname:'Il tuo nome o azienda', ph_saddr:'Via Roma 1, Milano',
@@ -1023,6 +1049,7 @@ const L = {
     an_earned:'Total Earned', an_out:'Outstanding', an_avg:'Avg Invoice',
     an_chart:'Monthly Revenue (last 12 months)', an_top:'Top Clients',
     set_h1:'Settings', set_sub:'Your freelance profile and app preferences.',
+    set_logo:'Logo', btn_logo_up:'Upload logo', btn_logo_rm:'Remove', hint_logo:'Optional. Shown on your PDFs and client page.', t_logo_big:'Image too large (max 5 MB).', t_logo_db:'Logo not saved: run the database SQL update first.',
     set_prof:'Freelance Profile', set_name:'Name / Business Name', set_email:'Email',
     set_vat:'VAT Number', set_addr:'Address',
     ph_sname:'Your name or company', ph_saddr:'123 Main St, London',
@@ -1093,6 +1120,7 @@ const L = {
     an_earned:'Totaal Verdiend', an_out:'Openstaand', an_avg:'Gem. Factuur',
     an_chart:'Maandelijkse Omzet (laatste 12 maanden)', an_top:'Top Klanten',
     set_h1:'Instellingen', set_sub:'Uw freelanceprofiel en app-voorkeuren.',
+    set_logo:'Logo', btn_logo_up:'Logo uploaden', btn_logo_rm:'Verwijderen', hint_logo:'Optioneel. Zichtbaar op je pdf\'s en klantpagina.', t_logo_big:'Afbeelding te groot (max 5 MB).', t_logo_db:'Logo niet opgeslagen: voer eerst de SQL-update van de database uit.',
     set_prof:'Freelanceprofiel', set_name:'Naam / Bedrijfsnaam', set_email:'E-mail',
     set_vat:'BTW-nummer', set_addr:'Adres',
     ph_sname:'Uw naam of bedrijf', ph_saddr:'Straatnaam 1, Amsterdam',
@@ -1163,6 +1191,7 @@ const L = {
     an_earned:'Gesamt Verdient', an_out:'Offene Posten', an_avg:'Ø Rechnung',
     an_chart:'Monatlicher Umsatz (letzte 12 Monate)', an_top:'Top Kunden',
     set_h1:'Einstellungen', set_sub:'Ihr Freelancer-Profil und App-Einstellungen.',
+    set_logo:'Logo', btn_logo_up:'Logo hochladen', btn_logo_rm:'Entfernen', hint_logo:'Optional. Erscheint auf PDFs und der Kundenseite.', t_logo_big:'Bild zu groß (max. 5 MB).', t_logo_db:'Logo nicht gespeichert: zuerst das SQL-Update der Datenbank ausführen.',
     set_prof:'Freelancer-Profil', set_name:'Name / Firmenname', set_email:'E-Mail',
     set_vat:'USt-IdNr.', set_addr:'Adresse',
     ph_sname:'Ihr Name oder Unternehmen', ph_saddr:'Musterstraße 1, Berlin',
@@ -1608,7 +1637,7 @@ async function doLogout() {
   await _sb.auth.signOut();
   USER = null;
   S.invoices = [];
-  S.settings = { name:'', email:'', vat:'', vat2:'', address:'', defaultRate:50, taxRate:15, currency:'EUR', terms:'', dueDays:30, country:'IT', iban:'', vatOnInvoice:22, vatEnabled:true, ritenuta:false, kleinunternehmer:false, autoentrepreneur:false };
+  S.settings = { name:'', email:'', vat:'', vat2:'', address:'', defaultRate:50, taxRate:15, currency:'EUR', terms:'', dueDays:30, country:'IT', iban:'', vatOnInvoice:22, vatEnabled:true, ritenuta:false, kleinunternehmer:false, autoentrepreneur:false, logo:'' };
   showView('login');
 }
 
@@ -1694,6 +1723,7 @@ async function loadApp() {
         ritenuta:         d.ritenuta         === true,
         kleinunternehmer: d.kleinunternehmer === true,
         autoentrepreneur: d.autoentrepreneur === true,
+        logo:             safeLogo(d.logo),
         terms:            d.terms            || '',
         dueDays:          parseInt(d.due_days)           || 30,
       };
@@ -2088,6 +2118,13 @@ async function loadClientView(token) {
     }
 
     renderClientPay(inv);
+    _sb.rpc('get_logo_by_token', { p_token: token }).then(({ data }) => {
+      const src = safeLogo(data);
+      if (!src) return;
+      const el = document.getElementById('cv-logo');
+      el.src = src;
+      el.classList.remove('hidden');
+    });
 
     loadEl.classList.add('hidden');
     if (card) card.classList.remove('hidden');
@@ -2364,6 +2401,7 @@ function loadSetForm() {
   let activeTheme = DEFAULT_THEME;
   try { activeTheme = localStorage.getItem('df_theme') || DEFAULT_THEME; } catch(_) {}
   renderThemeSwatches(activeTheme);
+  renderLogoPreview();
   document.getElementById('s-country').value  = S.settings.country     || 'IT';
   document.getElementById('s-name').value     = S.settings.name        || '';
   document.getElementById('s-email').value    = S.settings.email       || '';
@@ -2415,12 +2453,13 @@ async function saveSettings() {
     ritenuta:         S.settings.ritenuta,
     kleinunternehmer: S.settings.kleinunternehmer,
     autoentrepreneur: S.settings.autoentrepreneur,
+    logo:             S.settings.logo || '',
     terms:            document.getElementById('s-terms').value.trim(),
     dueDays:          parseInt(document.getElementById('s-days').value)   || 30,
   };
 
   try {
-    const { error } = await _sb.from('settings').upsert({
+    const row = {
       user_id:          USER.id,
       country:          S.settings.country,
       name:             S.settings.name,
@@ -2440,8 +2479,16 @@ async function saveSettings() {
       terms:            S.settings.terms,
       due_days:         S.settings.dueDays,
       lang:             S.lang,
+      logo:             S.settings.logo || null,
       updated_at:       new Date().toISOString()
-    });
+    };
+    let { error } = await _sb.from('settings').upsert(row);
+    // Databases without the logo column: save everything else and say why the logo didn't stick.
+    if (error && /logo/.test(error.message || '')) {
+      delete row.logo;
+      ({ error } = await _sb.from('settings').upsert(row));
+      if (!error) { toast('⚠️', t('t_logo_db')); return; }
+    }
     if (error) throw error;
     toast('✅', t('t_saved'));
   } catch (err) {
@@ -2485,8 +2532,19 @@ function exportPDF(id) {
   // Slim header: the freelancer's own name, document type and number
   doc.setFillColor(...accent);
   doc.rect(0, 0, W, 3, 'F');
+  let nameX = M;
+  const logo = safeLogo(S.settings.logo);
+  if (logo) {
+    try {
+      const { width, height } = doc.getImageProperties(logo);
+      const s = Math.min(40 / width, 14 / height);
+      const lw = width * s, lh = height * s;
+      doc.addImage(logo, 'PNG', M, 15 - lh / 2, lw, lh);
+      nameX = M + lw + 5;
+    } catch (_) {}
+  }
   doc.setFontSize(18); doc.setFont('helvetica','bold'); doc.setTextColor(15,15,15);
-  doc.text(doc.splitTextToSize(sender, 110)[0], M, 20);
+  doc.text(doc.splitTextToSize(sender, 150 - nameX)[0], nameX, 20);
   doc.setFontSize(8); doc.setFont('helvetica','bold'); doc.setTextColor(130,130,130);
   doc.text(t('pdf_type'), W-M, 14, {align:'right'});
   doc.setFontSize(13); doc.setTextColor(15,15,15);
@@ -2754,6 +2812,49 @@ ${lines}
   document.body.appendChild(a); a.click();
   document.body.removeChild(a); URL.revokeObjectURL(url);
   toast('📑', t('t_ubl'));
+}
+
+// ── LOGO ──────────────────────────────────────────────────────────────
+function safeLogo(u) {
+  return typeof u === 'string' && /^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(u) ? u : '';
+}
+
+function onLogoFile(input) {
+  const file = input.files && input.files[0];
+  input.value = '';
+  if (!file || !/^image\//.test(file.type)) return;
+  if (file.size > 5 * 1024 * 1024) { toast('⚠️', t('t_logo_big')); return; }
+  const reader = new FileReader();
+  reader.onload = () => {
+    const img = new Image();
+    img.onload = () => {
+      const w0 = img.naturalWidth || 300, h0 = img.naturalHeight || 150;
+      const scale = Math.min(1, 480 / w0, 240 / h0);
+      const c = document.createElement('canvas');
+      c.width = Math.max(1, Math.round(w0 * scale));
+      c.height = Math.max(1, Math.round(h0 * scale));
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      S.settings.logo = c.toDataURL('image/png');
+      renderLogoPreview();
+    };
+    img.src = reader.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function removeLogo() {
+  S.settings.logo = '';
+  renderLogoPreview();
+}
+
+function renderLogoPreview() {
+  const src = safeLogo(S.settings.logo);
+  const img = document.getElementById('s-logo-img');
+  if (!img) return;
+  img.classList.toggle('hidden', !src);
+  if (src) img.src = src; else img.removeAttribute('src');
+  document.getElementById('s-logo-empty').classList.toggle('hidden', !!src);
+  document.getElementById('s-logo-rm').classList.toggle('hidden', !src);
 }
 
 // ── THEME ─────────────────────────────────────────────────────────────
