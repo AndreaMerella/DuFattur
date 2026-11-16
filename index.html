@@ -726,7 +726,7 @@ create policy "owner_settings" on public.settings for all to authenticated
                 <h3 class="text-[10px] font-black uppercase tracking-widest text-gray-500 mb-5" data-i18n="set_prof">Profilo Freelance</h3>
                 <div class="mb-4">
                     <label class="block text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-2" data-i18n="set_country">Paese</label>
-                    <select id="s-country" class="ifield" onchange="onCountryChange()">
+                    <select id="s-country" class="ifield" onchange="onCountryChange(true)">
                         <option value="IT">🇮🇹 IT</option>
                         <option value="NL">🇳🇱 NL</option>
                         <option value="DE">🇩🇪 DE</option>
@@ -1305,7 +1305,7 @@ function setLang(l) {
 
 // ── COUNTRY / VAT LOGIC ───────────────────────────────────────────────
 const COUNTRY_FLAGS = {IT:'🇮🇹',NL:'🇳🇱',DE:'🇩🇪',GB:'🇬🇧',FR:'🇫🇷',ES:'🇪🇸',PT:'🇵🇹',CH:'🇨🇭',SE:'🇸🇪',US:'🇺🇸',CA:'🇨🇦',AU:'🇦🇺'};
-function onCountryChange() {
+function onCountryChange(userChanged = false) {
   const code = document.getElementById('s-country')?.value || S.settings.country || 'IT';
   const c    = COUNTRIES[code] || COUNTRIES.IT;
   // Update all option labels with translated country names
@@ -1338,7 +1338,7 @@ function onCountryChange() {
   // VAT rate hint
   const vatRateEl = document.getElementById('s-vat-rate');
   const hintEl    = document.getElementById('vat-tax-name-hint');
-  if (vatRateEl && !vatRateEl.value) vatRateEl.value = c.vatRate;
+  if (vatRateEl && (userChanged || !vatRateEl.value)) vatRateEl.value = c.vatRate;
   if (hintEl) hintEl.textContent = `${c.taxName} ${c.vatRate}%`;
 
   // Currency auto-suggest
