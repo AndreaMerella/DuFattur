@@ -179,6 +179,7 @@
     <nav class="flex flex-col gap-1 flex-1">
         <button onclick="showView('dashboard')"  id="nav-dashboard"  class="nav-btn active"><span class="ico">⚡</span><span class="sl" data-i18n="nav_dash">Dashboard</span></button>
         <button onclick="showView('invoice')"    id="nav-invoice"    class="nav-btn"><span class="ico">📋</span><span class="sl" data-i18n="nav_inv">Nuovo Proforma</span></button>
+        <button onclick="showView('expenses')"   id="nav-expenses"   class="nav-btn"><span class="ico">🧾</span><span class="sl" data-i18n="nav_exp">Spese</span></button>
         <button onclick="showView('analytics')"  id="nav-analytics"  class="nav-btn"><span class="ico">📊</span><span class="sl" data-i18n="nav_an">Analisi</span></button>
         <button onclick="showView('settings')"   id="nav-settings"   class="nav-btn"><span class="ico">⚙️</span><span class="sl" data-i18n="nav_set">Impostazioni</span></button>
     </nav>
@@ -347,6 +348,25 @@ as $$ select s.logo from public.settings s join public.invoices i on i.user_id =
       where i.public_token = p_token limit 1 $$;
 
 grant execute on function public.get_logo_by_token(uuid) to anon, authenticated;
+
+-- Business expenses (receipts stay private to their owner)
+create table if not exists public.expenses (
+  id            uuid          primary key default gen_random_uuid(),
+  user_id       uuid          not null references auth.users(id) on delete cascade,
+  date          date          not null,
+  vendor        text,
+  description   text,
+  amount        numeric(12,2) not null,
+  vat_type      text          not null default 'r:0',
+  vat_amount    numeric(12,2) not null default 0,
+  receipt       text,
+  receipt_type  text,
+  created_at    timestamptz   not null default now()
+);
+alter table public.expenses enable row level security;
+drop policy if exists "owner_expenses" on public.expenses;
+create policy "owner_expenses" on public.expenses for all to authenticated
+  using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
 -- Daily heartbeat from GitHub Actions keeps the free project from pausing
 create table if not exists public.heartbeat (id int primary key, pinged_at timestamptz not null default now());
@@ -748,6 +768,54 @@ grant execute on function public.keepalive() to anon;</pre>
         </div>
     </div>
 
+    <!-- ══════════ EXPENSES ══════════ -->
+    <div id="view-expenses" class="hidden-view p-6 md:p-10 max-w-3xl mx-auto">
+        <header class="mb-8">
+            <h1 class="text-3xl font-black" data-i18n="nav_exp">Spese</h1>
+            <p class="text-gray-500 mt-1 text-sm" data-i18n="exp_sub">Ricevute e IVA da recuperare.</p>
+        </header>
+        <div id="ex-db-note" class="hidden card mb-6 text-sm text-yellow-300" style="border-color:rgba(234,179,8,.4)" data-i18n="exp_db"></div>
+        <div id="ex-summary" class="text-sm text-gray-400 mb-4"></div>
+        <form id="ex-form" onsubmit="saveExpense(event)" class="card mb-8" style="background:#0e0e0e;border-color:#1e1e1e;">
+            <h3 class="text-[10px] font-black uppercase tracking-widest text-gray-500 mb-4" data-i18n="exp_new">Nuova spesa</h3>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                <div>
+                    <label class="block text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-2" data-i18n="exp_date">Data</label>
+                    <input type="date" id="ex-date" class="ifield" required>
+                </div>
+                <div>
+                    <label class="block text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-2" data-i18n="exp_vendor">Fornitore</label>
+                    <input type="text" id="ex-vendor" class="ifield" placeholder="Anthropic, Google, MediaMarkt…" required>
+                </div>
+            </div>
+            <div class="mb-4">
+                <label class="block text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-2" data-i18n="exp_desc">Descrizione</label>
+                <input type="text" id="ex-desc" class="ifield">
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-2">
+                <div>
+                    <label class="block text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-2" data-i18n="exp_amount">Importo pagato</label>
+                    <input type="number" id="ex-amount" class="ifield" min="0.01" step="0.01" placeholder="0,00" oninput="expensePreview()" required>
+                </div>
+                <div>
+                    <label class="block text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-2" data-i18n="exp_vat">IVA</label>
+                    <select id="ex-vat" class="ifield" onchange="expensePreview()"></select>
+                </div>
+            </div>
+            <div id="ex-preview" class="text-xs text-gray-400 mb-1 min-h-[1rem]"></div>
+            <div id="ex-rc-hint" class="hidden text-[11px] text-gray-600 mb-3" data-i18n="exp_rc_hint"></div>
+            <div class="flex items-center gap-3 flex-wrap mt-3 mb-5">
+                <label class="btn-o text-[11px] py-2 px-3 cursor-pointer">
+                    <span>📎 </span><span data-i18n="exp_attach">Allega ricevuta</span>
+                    <input type="file" id="ex-file" accept="image/*,application/pdf" class="hidden" onchange="onExpenseFile(this)">
+                </label>
+                <span id="ex-file-name" class="text-xs text-gray-500"></span>
+            </div>
+            <button type="submit" id="ex-save" class="btn-y w-full" data-i18n="exp_save">SALVA SPESA</button>
+        </form>
+        <div id="ex-list" class="flex flex-col gap-2"></div>
+    </div>
+
     <!-- ══════════ ANALYTICS ══════════ -->
     <div id="view-analytics" class="hidden-view p-6 md:p-10 max-w-5xl mx-auto">
         <header class="mb-8">
@@ -992,6 +1060,7 @@ grant execute on function public.keepalive() to anon;</pre>
 // ── I18N ──────────────────────────────────────────────────────────────
 const L = {
   it: {
+    nav_exp:'Spese', exp_sub:'Ricevute e IVA da recuperare.', exp_new:'Nuova spesa', exp_date:'Data', exp_vendor:'Fornitore', exp_desc:'Descrizione', exp_amount:'Importo pagato', exp_vat:'IVA', exp_vstd:'{r}% IVA inclusa', exp_v0:'Senza IVA / 0%', exp_vrcout:'Reverse charge: fornitore fuori UE', exp_vrceu:'Reverse charge: fornitore in altro paese UE', exp_rc_hint:'Con il reverse charge non paghi IVA al fornitore: la dichiari e la detrai subito, quindi il saldo è zero.', exp_receipt:'Ricevuta (foto o PDF)', exp_attach:'Allega ricevuta', exp_save:'SALVA SPESA', exp_vat_back:'IVA da recuperare', exp_spent:'speso', exp_empty:'Nessuna spesa ancora.', exp_c_del:'Eliminare questa spesa?', exp_rc_tag:'Reverse charge', t_exp_saved:'Spesa salvata!', t_exp_del:'Spesa eliminata.', t_exp_warn:'Inserisci data, fornitore e importo.', t_rcpt_big:'File troppo grande (max 1,5 MB per i PDF, 10 MB per le foto).', exp_db:'Esegui l\'aggiornamento SQL del database per attivare le spese.', btw_paid:'IVA pagata (detraibile)', btw_pay:'Da versare', btw_back:'Da ricevere', btw_fill:'Valori per la dichiarazione',
     nav_dash:'Dashboard', nav_inv:'Nuovo Proforma', nav_an:'Analisi', nav_set:'Impostazioni',
     dash_h1:'Dashboard Operativa', dash_sub:'Monitora ore, incassi e stato dei proforma.',
     kpi_tot:'Totale Proforma', kpi_pend:'In Attesa', kpi_appr:'Da Incassare', kpi_tax:'Fondo Tasse',
@@ -1064,6 +1133,7 @@ const L = {
     set_regime:'Regime Fiscale Speciale',
   },
   en: {
+    nav_exp:'Expenses', exp_sub:'Receipts and the VAT you can reclaim.', exp_new:'New expense', exp_date:'Date', exp_vendor:'Supplier', exp_desc:'Description', exp_amount:'Amount paid', exp_vat:'VAT', exp_vstd:'{r}% VAT included', exp_v0:'No VAT / 0%', exp_vrcout:'Reverse charge: supplier outside the EU', exp_vrceu:'Reverse charge: supplier in another EU country', exp_rc_hint:'With reverse charge you pay no VAT to the supplier: you declare it and deduct it at once, so it nets to zero.', exp_receipt:'Receipt (photo or PDF)', exp_attach:'Attach receipt', exp_save:'SAVE EXPENSE', exp_vat_back:'VAT to reclaim', exp_spent:'spent', exp_empty:'No expenses yet.', exp_c_del:'Delete this expense?', exp_rc_tag:'Reverse charge', t_exp_saved:'Expense saved!', t_exp_del:'Expense deleted.', t_exp_warn:'Enter date, supplier and amount.', t_rcpt_big:'File too large (max 1.5 MB for PDFs, 10 MB for photos).', exp_db:'Run the database SQL update to enable expenses.', btw_paid:'VAT paid (reclaimable)', btw_pay:'To pay', btw_back:'To get back', btw_fill:'Numbers for your return',
     nav_dash:'Dashboard', nav_inv:'New Invoice', nav_an:'Analytics', nav_set:'Settings',
     dash_h1:'Operations Dashboard', dash_sub:'Track hours, revenue, and invoice status.',
     kpi_tot:'Total Invoices', kpi_pend:'Pending', kpi_appr:'Outstanding', kpi_tax:'Tax Vault',
@@ -1136,6 +1206,7 @@ const L = {
     set_regime:'Special Tax Regime',
   },
   nl: {
+    nav_exp:'Kosten', exp_sub:'Bonnetjes en de btw die je terugkrijgt.', exp_new:'Nieuwe kosten', exp_date:'Datum', exp_vendor:'Leverancier', exp_desc:'Omschrijving', exp_amount:'Betaald bedrag', exp_vat:'Btw', exp_vstd:'Inclusief {r}% btw', exp_v0:'Geen btw / 0%', exp_vrcout:'Btw verlegd: leverancier buiten de EU', exp_vrceu:'Btw verlegd: leverancier in ander EU-land', exp_rc_hint:'Bij verlegde btw betaal je de leverancier geen btw: je geeft het aan en trekt het meteen weer af, netto € 0.', exp_receipt:'Bonnetje (foto of pdf)', exp_attach:'Bonnetje toevoegen', exp_save:'KOSTEN OPSLAAN', exp_vat_back:'Btw terug', exp_spent:'uitgegeven', exp_empty:'Nog geen kosten.', exp_c_del:'Deze kosten verwijderen?', exp_rc_tag:'Verlegd', t_exp_saved:'Kosten opgeslagen!', t_exp_del:'Kosten verwijderd.', t_exp_warn:'Vul datum, leverancier en bedrag in.', t_rcpt_big:'Bestand te groot (max 1,5 MB voor pdf, 10 MB voor foto’s).', exp_db:'Voer de SQL-update van de database uit om kosten te activeren.', btw_paid:'Voorbelasting', btw_pay:'Te betalen', btw_back:'Terug te krijgen', btw_fill:'Invullen bij je aangifte',
     nav_dash:'Dashboard', nav_inv:'Nieuwe Factuur', nav_an:'Analyse', nav_set:'Instellingen',
     dash_h1:'Operationeel Dashboard', dash_sub:'Volg uren, omzet en factuurstatus.',
     kpi_tot:'Totaal Facturen', kpi_pend:'In Behandeling', kpi_appr:'Openstaand', kpi_tax:'Belastingreserve',
@@ -1208,6 +1279,7 @@ const L = {
     set_regime:'Speciaal Belastingregime',
   },
   de: {
+    nav_exp:'Ausgaben', exp_sub:'Belege und die Vorsteuer, die du zurückbekommst.', exp_new:'Neue Ausgabe', exp_date:'Datum', exp_vendor:'Lieferant', exp_desc:'Beschreibung', exp_amount:'Bezahlter Betrag', exp_vat:'USt.', exp_vstd:'Inkl. {r}% USt.', exp_v0:'Ohne USt. / 0%', exp_vrcout:'Reverse Charge: Lieferant außerhalb der EU', exp_vrceu:'Reverse Charge: Lieferant in anderem EU-Land', exp_rc_hint:'Beim Reverse Charge zahlst du dem Lieferanten keine USt.: du meldest sie und ziehst sie sofort wieder ab, netto null.', exp_receipt:'Beleg (Foto oder PDF)', exp_attach:'Beleg anhängen', exp_save:'AUSGABE SPEICHERN', exp_vat_back:'Vorsteuer', exp_spent:'ausgegeben', exp_empty:'Noch keine Ausgaben.', exp_c_del:'Diese Ausgabe löschen?', exp_rc_tag:'Reverse Charge', t_exp_saved:'Ausgabe gespeichert!', t_exp_del:'Ausgabe gelöscht.', t_exp_warn:'Datum, Lieferant und Betrag eingeben.', t_rcpt_big:'Datei zu groß (max. 1,5 MB für PDFs, 10 MB für Fotos).', exp_db:'Führe das SQL-Update der Datenbank aus, um Ausgaben zu aktivieren.', btw_paid:'Vorsteuer', btw_pay:'Zu zahlen', btw_back:'Erstattung', btw_fill:'Werte für die Erklärung',
     nav_dash:'Dashboard', nav_inv:'Neue Rechnung', nav_an:'Analyse', nav_set:'Einstellungen',
     dash_h1:'Betriebsdashboard', dash_sub:'Stunden, Umsatz und Rechnungsstatus verfolgen.',
     kpi_tot:'Rechnungen Gesamt', kpi_pend:'Ausstehend', kpi_appr:'Offene Posten', kpi_tax:'Steuerrücklage',
@@ -1361,7 +1433,9 @@ let S = {
     country:'IT', iban:'', vatOnInvoice:22, vatEnabled:true,
     ritenuta:false, kleinunternehmer:false, autoentrepreneur:false
   },
-  timer: { on: false, earn: 0, elapsed: 0, iv: null, rate: 50 }
+  timer: { on: false, earn: 0, elapsed: 0, iv: null, rate: 50 },
+  expenses: [],
+  expensesReady: false
 };
 let revChart = null;
 let itemIdx  = 0;
@@ -1584,8 +1658,8 @@ function syncVatToggleUI() {
 }
 
 // ── VIEW MANAGEMENT ───────────────────────────────────────────────────
-const ALL_VIEWS = ['setup','login','loading','dashboard','invoice','client','analytics','settings'];
-const SIDEBAR_VIEWS = ['dashboard','invoice','analytics','settings'];
+const ALL_VIEWS = ['setup','login','loading','dashboard','invoice','client','expenses','analytics','settings'];
+const SIDEBAR_VIEWS = ['dashboard','invoice','expenses','analytics','settings'];
 
 function showView(v, opts = {}) {
   ALL_VIEWS.forEach(n => {
@@ -1612,6 +1686,7 @@ function showView(v, opts = {}) {
   if (v === 'analytics') renderAnalytics();
   if (v === 'settings')  loadSetForm();
   if (v === 'invoice')   initInvForm();
+  if (v === 'expenses')  initExpenses();
   window.scrollTo(0, 0);
 }
 
@@ -1721,6 +1796,7 @@ async function doLogout() {
   await _sb.auth.signOut();
   USER = null;
   S.invoices = [];
+  S.expenses = [];
   S.settings = { name:'', email:'', vat:'', vat2:'', address:'', defaultRate:50, taxRate:15, currency:'EUR', terms:'', dueDays:30, country:'IT', iban:'', vatOnInvoice:22, vatEnabled:true, ritenuta:false, kleinunternehmer:false, autoentrepreneur:false, logo:'' };
   showView('login');
 }
@@ -1779,10 +1855,14 @@ async function boot() {
 async function loadApp() {
   showView('loading', { msg: 'Loading your data...' });
   try {
-    const [invRes, setRes] = await Promise.all([
+    const [invRes, setRes, exRes] = await Promise.all([
       _sb.from('invoices').select('*').eq('user_id', USER.id).order('created_at', { ascending: false }),
-      _sb.from('settings').select('*').eq('user_id', USER.id).single()
+      _sb.from('settings').select('*').eq('user_id', USER.id).single(),
+      _sb.from('expenses').select(EXPENSE_COLS).eq('user_id', USER.id).order('date', { ascending: false })
     ]);
+    // Expenses are optional: older databases don't have the table yet
+    S.expensesReady = !exRes.error;
+    S.expenses = (exRes.data || []).map(dbToExpense);
 
     if (invRes.error) throw invRes.error;
 
@@ -2419,6 +2499,173 @@ function renderDash() {
   }).join('');
 }
 
+// ── EXPENSES ──────────────────────────────────────────────────────────
+const EXPENSE_COLS = 'id,date,vendor,description,amount,vat_type,vat_amount,receipt_type,created_at';
+const REDUCED_VAT = { NL:9, DE:7, IT:10, BE:6, FR:5.5, ES:10, PT:6, AT:10, IE:13.5, PL:8, SE:12, GB:5, CH:2.6 };
+let _exReceipt = null;
+
+function dbToExpense(r) {
+  return { id: r.id, date: r.date, vendor: r.vendor || '', description: r.description || '',
+    amount: parseFloat(r.amount) || 0, vatType: r.vat_type || 'r:0', vatAmount: parseFloat(r.vat_amount) || 0,
+    receiptType: r.receipt_type || '' };
+}
+
+function stdVatRate() {
+  const c = COUNTRIES[S.settings.country] || COUNTRIES.IT;
+  const v = parseFloat(S.settings.vatOnInvoice);
+  return Number.isFinite(v) && v > 0 ? v : c.vatRate;
+}
+
+function expenseVat(amount, type) {
+  if (type === 'rc_non_eu' || type === 'rc_eu') return Math.round(amount * stdVatRate()) / 100;
+  const r = parseFloat(String(type).replace('r:', '')) || 0;
+  return Math.round(amount * r / (100 + r) * 100) / 100;
+}
+
+function initExpenses() {
+  const sel = document.getElementById('ex-vat');
+  const std = stdVatRate(), red = REDUCED_VAT[S.settings.country];
+  const opts = [[`r:${std}`, t('exp_vstd').replace('{r}', std)]];
+  if (red) opts.push([`r:${red}`, t('exp_vstd').replace('{r}', red)]);
+  opts.push(['r:0', t('exp_v0')], ['rc_non_eu', t('exp_vrcout')], ['rc_eu', t('exp_vrceu')]);
+  sel.innerHTML = '';
+  opts.forEach(([v, label]) => { const o = document.createElement('option'); o.value = v; o.textContent = label; sel.appendChild(o); });
+  if (!document.getElementById('ex-date').value) document.getElementById('ex-date').value = new Date().toISOString().slice(0, 10);
+  document.getElementById('ex-db-note').classList.toggle('hidden', S.expensesReady);
+  document.getElementById('ex-save').disabled = !S.expensesReady;
+  expensePreview();
+  renderExpenses();
+}
+
+function expensePreview() {
+  const amount = parseFloat(document.getElementById('ex-amount').value) || 0;
+  const type = document.getElementById('ex-vat').value;
+  const rc = type === 'rc_non_eu' || type === 'rc_eu';
+  document.getElementById('ex-rc-hint').classList.toggle('hidden', !rc);
+  document.getElementById('ex-preview').textContent = amount > 0 && (rc || expenseVat(amount, type) > 0)
+    ? `${t('exp_vat_back')}: ${fmt(expenseVat(amount, type))}${rc ? ' (± 0)' : ''}` : '';
+}
+
+function onExpenseFile(input) {
+  const file = input.files && input.files[0];
+  input.value = '';
+  if (!file) return;
+  const nameEl = document.getElementById('ex-file-name');
+  if (file.type === 'application/pdf') {
+    if (file.size > 1.5 * 1024 * 1024) { toast('⚠️', t('t_rcpt_big')); return; }
+    const reader = new FileReader();
+    reader.onload = () => { _exReceipt = { data: reader.result, type: 'application/pdf' }; nameEl.textContent = '✓ ' + file.name; };
+    reader.readAsDataURL(file);
+    return;
+  }
+  if (!/^image\//.test(file.type) || file.size > 10 * 1024 * 1024) { toast('⚠️', t('t_rcpt_big')); return; }
+  const reader = new FileReader();
+  reader.onload = () => {
+    const img = new Image();
+    img.onload = () => {
+      const k = Math.min(1, 1400 / Math.max(img.naturalWidth || 1, img.naturalHeight || 1));
+      const c = document.createElement('canvas');
+      c.width = Math.max(1, Math.round((img.naturalWidth || 1) * k));
+      c.height = Math.max(1, Math.round((img.naturalHeight || 1) * k));
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height);
+      ctx.drawImage(img, 0, 0, c.width, c.height);
+      _exReceipt = { data: c.toDataURL('image/jpeg', 0.72), type: 'image/jpeg' };
+      nameEl.textContent = '✓ ' + file.name;
+    };
+    img.src = reader.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function safeReceipt(u) {
+  return typeof u === 'string' && /^data:(image\/jpeg|image\/png|application\/pdf);base64,[A-Za-z0-9+/=]+$/.test(u) ? u : '';
+}
+
+async function saveExpense(e) {
+  e.preventDefault();
+  const date = document.getElementById('ex-date').value;
+  const vendor = document.getElementById('ex-vendor').value.trim();
+  const amount = Math.round((parseFloat(document.getElementById('ex-amount').value) || 0) * 100) / 100;
+  const type = document.getElementById('ex-vat').value;
+  if (!date || !vendor || amount <= 0) { toast('⚠️', t('t_exp_warn')); return; }
+  const btn = document.getElementById('ex-save');
+  btn.disabled = true;
+  try {
+    const row = { user_id: USER.id, date, vendor, description: document.getElementById('ex-desc').value.trim() || null,
+      amount, vat_type: type, vat_amount: expenseVat(amount, type),
+      receipt: _exReceipt ? _exReceipt.data : null, receipt_type: _exReceipt ? _exReceipt.type : null };
+    const { data, error } = await _sb.from('expenses').insert([row]).select(EXPENSE_COLS).single();
+    if (error) throw error;
+    S.expenses.unshift(dbToExpense(data));
+    S.expenses.sort((a, b) => b.date.localeCompare(a.date));
+    _exReceipt = null;
+    ['ex-vendor', 'ex-desc', 'ex-amount'].forEach(id => { document.getElementById(id).value = ''; });
+    document.getElementById('ex-file-name').textContent = '';
+    expensePreview();
+    renderExpenses();
+    toast('🧾', t('t_exp_saved'));
+  } catch (err) {
+    toast('❌', err.message || 'Failed to save expense');
+  } finally {
+    btn.disabled = !S.expensesReady;
+  }
+}
+
+async function delExpense(id) {
+  if (!confirm(t('exp_c_del'))) return;
+  const { error } = await _sb.from('expenses').delete().eq('id', id).eq('user_id', USER.id);
+  if (error) { toast('❌', error.message); return; }
+  S.expenses = S.expenses.filter(x => x.id !== id);
+  renderExpenses();
+  toast('🗑️', t('t_exp_del'));
+}
+
+async function openReceipt(id) {
+  const win = window.open('', '_blank');
+  const { data, error } = await _sb.from('expenses').select('receipt').eq('id', id).single();
+  const src = !error && data ? safeReceipt(data.receipt) : '';
+  if (!src) { if (win) win.close(); toast('❌', error ? error.message : 'Receipt not found'); return; }
+  const [head, b64] = src.split(',');
+  const bytes = Uint8Array.from(atob(b64), ch => ch.charCodeAt(0));
+  const url = URL.createObjectURL(new Blob([bytes], { type: head.slice(5, head.indexOf(';')) }));
+  if (win) win.location.href = url; else window.location.href = url;
+}
+
+function renderExpenses() {
+  const list = document.getElementById('ex-list');
+  if (!list) return;
+  const f = btwFiling();
+  const inQ = S.expenses.filter(x => inQuarter(x.date, f));
+  const spent = inQ.reduce((a, x) => a + x.amount, 0);
+  const back = inQ.filter(x => !x.vatType.startsWith('rc')).reduce((a, x) => a + x.vatAmount, 0);
+  document.getElementById('ex-summary').textContent = S.expenses.length
+    ? `Q${f.q + 1} ${f.year}: ${fmt(spent)} ${t('exp_spent')} · ${t('exp_vat_back')} ${fmt(back)}` : '';
+  if (!S.expenses.length) { list.innerHTML = `<div class="text-center text-gray-600 text-sm py-8">${esc(t('exp_empty'))}</div>`; return; }
+  list.innerHTML = S.expenses.map(x => {
+    const rc = x.vatType.startsWith('rc');
+    const vatTxt = rc ? `${t('exp_rc_tag')} ${x.vatType === 'rc_eu' ? '4b' : '4a'}` : (x.vatAmount > 0 ? `${t('exp_vat')} ${fmt(x.vatAmount)}` : '');
+    const id = esc(x.id);
+    return `<div class="inv-row flex items-center justify-between gap-3">
+      <div class="min-w-0">
+        <div class="font-bold text-white truncate">${esc(x.vendor)}${x.description ? ` <span class="text-gray-500 font-normal">· ${esc(x.description)}</span>` : ''}</div>
+        <div class="text-[11px] text-gray-500">${esc(fmtDate(x.date))}${vatTxt ? ` · ${esc(vatTxt)}` : ''}</div>
+      </div>
+      <div class="flex items-center gap-2 flex-shrink-0">
+        <div class="font-black text-white mr-1">${esc(fmt(x.amount))}</div>
+        ${x.receiptType ? `<button type="button" onclick="openReceipt('${id}')" class="btn-o text-[11px] py-1.5 px-2.5" title="${esc(t('exp_receipt'))}">📎</button>` : ''}
+        <button type="button" onclick="delExpense('${id}')" class="btn-o text-[11px] py-1.5 px-2.5 text-red-400 border-red-900 hover:border-red-600">✕</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function inQuarter(isoDate, f) {
+  if (!isoDate) return false;
+  const d = new Date(isoDate + 'T12:00:00');
+  return d.getFullYear() === f.year && Math.floor(d.getMonth() / 3) === f.q;
+}
+
 // ── BTW / VAT QUARTER ─────────────────────────────────────────────────
 // NL: quarterly return due the last day of the month after the quarter.
 function btwFiling(today = new Date()) {
@@ -2436,30 +2683,55 @@ function renderBtwCard() {
   const isNL = (S.settings.country || 'IT') === 'NL';
   const f = btwFiling();
   const cur = S.settings.currency || 'EUR';
-  const inQ = S.invoices.filter(i => {
-    if (!i.issueDate || (i.currency && i.currency !== cur)) return false;
-    const d = new Date(i.issueDate + 'T12:00:00');
-    return d.getFullYear() === f.year && Math.floor(d.getMonth() / 3) === f.q;
-  });
-  const rev = inQ.reduce((a, i) => a + parseFloat(i.subtotal || i.total || 0), 0);
-  const vat = inQ.reduce((a, i) => a + parseFloat(i.vatAmount || 0), 0);
+  const invs = S.invoices.filter(i => inQuarter(i.issueDate, f) && (!i.currency || i.currency === cur));
+  const exps = S.expenses.filter(x => inQuarter(x.date, f));
+  const sum = (arr, fn) => arr.reduce((acc, x) => acc + fn(x), 0);
+
+  const std = stdVatRate(), red = REDUCED_VAT[S.settings.country];
+  const salesAt = test => { const g = invs.filter(i => test(parseFloat(i.vatRate) || 0));
+    return { base: sum(g, i => parseFloat(i.subtotal || i.total || 0)), vat: sum(g, i => parseFloat(i.vatAmount || 0)) }; };
+  const s1a = salesAt(r => r === std), s1b = salesAt(r => r > 0 && r !== std), s1e = salesAt(r => r === 0);
+  const rcOf = type => { const g = exps.filter(x => x.vatType === type); return { base: sum(g, x => x.amount), vat: sum(g, x => x.vatAmount) }; };
+  const s4a = rcOf('rc_non_eu'), s4b = rcOf('rc_eu');
+  const paid = sum(exps.filter(x => !x.vatType.startsWith('rc')), x => x.vatAmount);
+  const s5b = paid + s4a.vat + s4b.vat;
+  const owed = s1a.vat + s1b.vat + s4a.vat + s4b.vat - s5b;
+  const charged = s1a.vat + s1b.vat;
+
   const days = Math.ceil((f.deadline - new Date()) / 86400000);
   const urgent = isNL && days <= 14;
   const dl = f.deadline.toISOString().slice(0, 10);
   const daysTxt = days <= 0 ? t('btw_today') : `${days} ${t('btw_days')}`;
+  const lbl = 'text-[10px] text-gray-500 uppercase font-bold tracking-widest';
+  const row = (code, name, base, vat) => `<tr class="border-t border-gray-900">
+      <td class="py-1.5 pr-2 font-mono text-gray-500">${code}</td><td class="py-1.5 pr-2 text-gray-400">${esc(name)}</td>
+      <td class="py-1.5 pr-2 text-right text-gray-300">${base === null ? '' : esc(fmt(base))}</td><td class="py-1.5 text-right font-bold">${esc(fmt(vat))}</td></tr>`;
+  let boxes = row('1a', `${t('btw_rev')} ${std}%`, s1a.base, s1a.vat);
+  if (s1b.base) boxes += row('1b', `${t('btw_rev')} ${red || ''}%`, s1b.base, s1b.vat);
+  if (s1e.base) boxes += row('1e', `${t('btw_rev')} 0%`, s1e.base, 0);
+  if (s4a.base) boxes += row('4a', t('exp_vrcout'), s4a.base, s4a.vat);
+  if (s4b.base) boxes += row('4b', t('exp_vrceu'), s4b.base, s4b.vat);
+  boxes += row('5b', t('btw_paid'), null, s5b);
+
   card.style.borderColor = urgent ? 'rgba(239,68,68,.5)' : '';
   card.innerHTML = `
-    <div class="flex items-start justify-between gap-4 flex-wrap">
+    <div class="flex items-start justify-between gap-4 flex-wrap mb-4">
       <div>
-        <div class="text-[10px] text-gray-500 uppercase font-bold tracking-widest mb-1">${esc(t('btw_title'))} · Q${f.q + 1} ${f.year}</div>
+        <div class="${lbl} mb-1">${esc(t('btw_title'))} · Q${f.q + 1} ${f.year}</div>
         ${isNL ? `<div class="text-sm ${urgent ? 'text-red-400' : 'text-gray-300'} font-bold">${esc(t('btw_due'))} ${esc(fmtDate(dl))} · ${esc(daysTxt)}</div>
         <div class="text-[11px] text-gray-600 mt-1">${esc(t('btw_zero'))}</div>` : ''}
       </div>
-      <div class="flex gap-6 text-right">
-        <div><div class="text-[10px] text-gray-500 uppercase font-bold tracking-widest mb-1">${esc(t('btw_rev'))}</div><div class="text-lg font-black">${esc(fmt(rev))}</div></div>
-        <div><div class="text-[10px] text-gray-500 uppercase font-bold tracking-widest mb-1">${esc(t('btw_vat'))}</div><div class="text-lg font-black text-accent">${esc(fmt(vat))}</div></div>
+      <div class="text-right">
+        <div class="${lbl} mb-1">${esc(owed >= 0 ? t('btw_pay') : t('btw_back'))}</div>
+        <div class="text-2xl font-black ${owed >= 0 ? 'text-accent' : 'text-green-400'}">${esc(fmt(Math.abs(owed)))}</div>
       </div>
     </div>
+    ${isNL ? `<div class="${lbl} mb-1">${esc(t('btw_fill'))}</div>
+    <div class="overflow-x-auto"><table class="w-full text-xs">${boxes}</table></div>` : `
+    <div class="flex gap-6 text-sm">
+      <div><div class="${lbl} mb-1">${esc(t('btw_vat'))}</div><div class="font-black">${esc(fmt(charged))}</div></div>
+      <div><div class="${lbl} mb-1">${esc(t('btw_paid'))}</div><div class="font-black">${esc(fmt(paid))}</div></div>
+    </div>`}
     ${isNL ? `<div class="flex gap-2 flex-wrap mt-4">
       <button type="button" onclick="downloadTaxCalendar()" class="btn-o text-[11px] py-2 px-3">📅 ${esc(t('btw_cal'))}</button>
       <a href="https://mijnzakelijk.belastingdienst.nl" target="_blank" rel="noopener" class="btn-o text-[11px] py-2 px-3">${esc(t('btw_portal'))} ↗</a>
