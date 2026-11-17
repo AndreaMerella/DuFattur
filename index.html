@@ -287,12 +287,14 @@
   freelancer_iban  text,
   freelancer_name  text,
   pay_link         text,
+  meta             jsonb,
   created_at       timestamptz   not null default now()
 );
 -- if upgrading an existing table, run:
 -- alter table public.invoices add column if not exists freelancer_iban text;
 -- alter table public.invoices add column if not exists freelancer_name text;
 -- alter table public.invoices add column if not exists pay_link text;
+-- alter table public.invoices add column if not exists meta jsonb;
 
 create table if not exists public.settings (
   user_id          uuid          primary key references auth.users(id) on delete cascade,
@@ -344,7 +346,16 @@ returns text language sql stable security definer set search_path = public
 as $$ select s.logo from public.settings s join public.invoices i on i.user_id = s.user_id
       where i.public_token = p_token limit 1 $$;
 
-grant execute on function public.get_logo_by_token(uuid) to anon, authenticated;</pre>
+grant execute on function public.get_logo_by_token(uuid) to anon, authenticated;
+
+-- Daily heartbeat from GitHub Actions keeps the free project from pausing
+create table if not exists public.heartbeat (id int primary key, pinged_at timestamptz not null default now());
+alter table public.heartbeat enable row level security;
+create or replace function public.keepalive()
+returns timestamptz language sql security definer set search_path = public
+as $$ insert into public.heartbeat (id, pinged_at) values (1, now())
+      on conflict (id) do update set pinged_at = excluded.pinged_at returning pinged_at $$;
+grant execute on function public.keepalive() to anon;</pre>
                             <button onclick="copySql()" class="absolute top-2 right-2 bg-accent text-black text-[10px] font-black px-3 py-1.5 rounded-lg transition hover:bg-yellow-300">COPY</button>
                         </div>
                     </div>
@@ -496,6 +507,9 @@ grant execute on function public.get_logo_by_token(uuid) to anon, authenticated;
             </div>
         </div>
 
+        <!-- BTW / VAT quarter: what to file and by when -->
+        <div id="btw-card" class="hidden card mb-8"></div>
+
         <!-- Invoice list -->
         <div class="flex items-center justify-between mb-4">
             <h2 class="text-lg font-black" data-i18n="list_h">Storico Proforma</h2>
@@ -547,7 +561,10 @@ grant execute on function public.get_logo_by_token(uuid) to anon, authenticated;
                         <span></span>
                     </div>
                     <div id="items-box" class="flex flex-col gap-2 mb-3"></div>
-                    <button type="button" onclick="addItem()" class="btn-o text-xs py-2 px-4 w-full" data-i18n="btn_add_item">+ Aggiungi Voce</button>
+                    <div class="flex gap-2">
+                        <button type="button" onclick="addItem()" class="btn-o text-xs py-2 px-4 flex-1" data-i18n="btn_add_item">+ Aggiungi Voce</button>
+                        <button type="button" onclick="addDiscount()" class="btn-o text-xs py-2 px-4" data-i18n="btn_discount">+ Sconto</button>
+                    </div>
                 </div>
 
                 <!-- Total preview -->
@@ -586,6 +603,17 @@ grant execute on function public.get_logo_by_token(uuid) to anon, authenticated;
                 <div class="mb-7">
                     <label class="block text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-2" data-i18n="lbl_notes">Note / Termini di Pagamento</label>
                     <textarea id="in-notes" rows="3" class="ifield resize-none" data-phi="ph_notes"></textarea>
+                </div>
+
+                <!-- Language the client receives the invoice in -->
+                <div class="mb-7">
+                    <label class="block text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-2" data-i18n="lbl_doclang">Invoice language</label>
+                    <select id="in-lang" class="ifield">
+                        <option value="it">🇮🇹 Italiano</option>
+                        <option value="en">🇬🇧 English</option>
+                        <option value="nl">🇳🇱 Nederlands</option>
+                        <option value="de">🇩🇪 Deutsch</option>
+                    </select>
                 </div>
 
                 <!-- Optional one-tap payment link -->
@@ -790,6 +818,10 @@ grant execute on function public.get_logo_by_token(uuid) to anon, authenticated;
                         <option value="ES">🇪🇸 ES</option>
                         <option value="PT">🇵🇹 PT</option>
                         <option value="CH">🇨🇭 CH</option>
+                        <option value="BE">🇧🇪 BE</option>
+                        <option value="AT">🇦🇹 AT</option>
+                        <option value="IE">🇮🇪 IE</option>
+                        <option value="PL">🇵🇱 PL</option>
                         <option value="SE">🇸🇪 SE</option>
                         <option value="US">🇺🇸 US</option>
                         <option value="CA">🇨🇦 CA</option>
@@ -847,6 +879,7 @@ grant execute on function public.get_logo_by_token(uuid) to anon, authenticated;
                             <option value="DKK">DKK (kr)</option>
                             <option value="SEK">SEK (kr)</option>
                             <option value="NOK">NOK (kr)</option>
+                            <option value="PLN">PLN (zł)</option>
                         </select>
                     </div>
                 </div>
@@ -983,6 +1016,7 @@ const L = {
     an_earned:'Totale Incassato', an_out:'Da Incassare', an_avg:'Fattura Media',
     an_chart:'Entrate Mensili (ultimi 12 mesi)', an_top:'Top Clienti',
     set_h1:'Impostazioni', set_sub:'Profilo freelance e preferenze dell\'app.',
+    lbl_discount:'Sconto', btn_discount:'+ Sconto', t_neg:'Il totale deve essere maggiore di zero.', lbl_doclang:'Lingua della fattura', pdf_amount_due:'DA PAGARE', pdf_invoice_it:'FATTURA', btw_title:'Dichiarazione IVA', btw_rev:'Fatturato (senza IVA)', btw_vat:'IVA addebitata', btw_due:'Scadenza', btw_days:'giorni', btw_today:'oggi', btw_zero:'Va presentata anche con fatturato zero.', btw_cal:'Aggiungi scadenze al calendario', btw_portal:'Belastingdienst', ics_btw:'Dichiarazione IVA (BTW)', ics_ib:'Dichiarazione dei redditi (NL)', ics_note:'Dichiarazione e pagamento entro questa data.', t_ics:'Calendario scaricato. Aprilo per aggiungere le scadenze.', err_offline:'Il server non risponde. Il database potrebbe essere in pausa.',
     made_with:'Creato con', set_logo:'Logo', btn_logo_up:'Carica logo', btn_logo_rm:'Rimuovi', hint_logo:'Opzionale. Appare sui PDF e sulla pagina del cliente.', t_logo_big:'Immagine troppo grande (max 5 MB).', t_logo_db:'Logo non salvato: esegui l\'aggiornamento SQL del database.',
     set_prof:'Profilo Freelance', set_name:'Nome / Ragione Sociale', set_email:'Email',
     set_vat:'P.IVA / VAT', set_addr:'Indirizzo',
@@ -1054,6 +1088,7 @@ const L = {
     an_earned:'Total Earned', an_out:'Outstanding', an_avg:'Avg Invoice',
     an_chart:'Monthly Revenue (last 12 months)', an_top:'Top Clients',
     set_h1:'Settings', set_sub:'Your freelance profile and app preferences.',
+    lbl_discount:'Discount', btn_discount:'+ Discount', t_neg:'The total must be greater than zero.', lbl_doclang:'Invoice language', pdf_amount_due:'AMOUNT DUE', pdf_invoice_it:'FATTURA', btw_title:'VAT return', btw_rev:'Revenue (excl. VAT)', btw_vat:'VAT charged', btw_due:'Deadline', btw_days:'days', btw_today:'today', btw_zero:'File it even if you had no revenue.', btw_cal:'Add deadlines to calendar', btw_portal:'Belastingdienst', ics_btw:'VAT return (BTW)', ics_ib:'Income tax return (NL)', ics_note:'File and pay by this date.', t_ics:'Calendar downloaded. Open it to add the deadlines.', err_offline:'Can\'t reach the server. The database may be paused.',
     made_with:'Made with', set_logo:'Logo', btn_logo_up:'Upload logo', btn_logo_rm:'Remove', hint_logo:'Optional. Shown on your PDFs and client page.', t_logo_big:'Image too large (max 5 MB).', t_logo_db:'Logo not saved: run the database SQL update first.',
     set_prof:'Freelance Profile', set_name:'Name / Business Name', set_email:'Email',
     set_vat:'VAT Number', set_addr:'Address',
@@ -1125,6 +1160,7 @@ const L = {
     an_earned:'Totaal Verdiend', an_out:'Openstaand', an_avg:'Gem. Factuur',
     an_chart:'Maandelijkse Omzet (laatste 12 maanden)', an_top:'Top Klanten',
     set_h1:'Instellingen', set_sub:'Uw freelanceprofiel en app-voorkeuren.',
+    lbl_discount:'Korting', btn_discount:'+ Korting', t_neg:'Het totaal moet groter zijn dan nul.', lbl_doclang:'Taal van de factuur', pdf_amount_due:'TE BETALEN', pdf_invoice_it:'FATTURA', btw_title:'Btw-aangifte', btw_rev:'Omzet (excl. btw)', btw_vat:'Gerekende btw', btw_due:'Uiterlijk', btw_days:'dagen', btw_today:'vandaag', btw_zero:'Ook doen als je geen omzet had.', btw_cal:'Deadlines in agenda zetten', btw_portal:'Belastingdienst', ics_btw:'Btw-aangifte', ics_ib:'Aangifte inkomstenbelasting', ics_note:'Aangifte doen en betalen vóór deze datum.', t_ics:'Agenda gedownload. Open het bestand om de deadlines toe te voegen.', err_offline:'De server reageert niet. De database staat mogelijk op pauze.',
     made_with:'Gemaakt met', set_logo:'Logo', btn_logo_up:'Logo uploaden', btn_logo_rm:'Verwijderen', hint_logo:'Optioneel. Zichtbaar op je pdf\'s en klantpagina.', t_logo_big:'Afbeelding te groot (max 5 MB).', t_logo_db:'Logo niet opgeslagen: voer eerst de SQL-update van de database uit.',
     set_prof:'Freelanceprofiel', set_name:'Naam / Bedrijfsnaam', set_email:'E-mail',
     set_vat:'BTW-nummer', set_addr:'Adres',
@@ -1196,6 +1232,7 @@ const L = {
     an_earned:'Gesamt Verdient', an_out:'Offene Posten', an_avg:'Ø Rechnung',
     an_chart:'Monatlicher Umsatz (letzte 12 Monate)', an_top:'Top Kunden',
     set_h1:'Einstellungen', set_sub:'Ihr Freelancer-Profil und App-Einstellungen.',
+    lbl_discount:'Rabatt', btn_discount:'+ Rabatt', t_neg:'Der Gesamtbetrag muss größer als null sein.', lbl_doclang:'Rechnungssprache', pdf_amount_due:'ZU ZAHLEN', pdf_invoice_it:'FATTURA', btw_title:'Umsatzsteuer-Erklärung', btw_rev:'Umsatz (netto)', btw_vat:'Berechnete USt.', btw_due:'Frist', btw_days:'Tage', btw_today:'heute', btw_zero:'Auch ohne Umsatz abgeben.', btw_cal:'Fristen in den Kalender', btw_portal:'Belastingdienst', ics_btw:'Umsatzsteuer-Erklärung (BTW)', ics_ib:'Einkommensteuererklärung (NL)', ics_note:'Bis zu diesem Datum einreichen und zahlen.', t_ics:'Kalender heruntergeladen. Öffnen, um die Fristen hinzuzufügen.', err_offline:'Server nicht erreichbar. Die Datenbank ist möglicherweise pausiert.',
     made_with:'Erstellt mit', set_logo:'Logo', btn_logo_up:'Logo hochladen', btn_logo_rm:'Entfernen', hint_logo:'Optional. Erscheint auf PDFs und der Kundenseite.', t_logo_big:'Bild zu groß (max. 5 MB).', t_logo_db:'Logo nicht gespeichert: zuerst das SQL-Update der Datenbank ausführen.',
     set_prof:'Freelancer-Profil', set_name:'Name / Firmenname', set_email:'E-Mail',
     set_vat:'USt-IdNr.', set_addr:'Adresse',
@@ -1290,6 +1327,22 @@ const COUNTRIES = {
        id1:{it:'Business Number',en:'Business Number'}, id1Ph:'123456789 RT0001',
        id2:{it:'',en:''}, id2Ph:'',
        requiresIBAN:false, extraToggles:[] },
+  PL:{ name:{it:'Polonia',en:'Poland',nl:'Polen',de:'Polen'}, currency:'PLN', vatRate:23, taxName:'VAT',
+       id1:{it:'NIP',en:'NIP'}, id1Ph:'1234567890',
+       id2:{it:'REGON',en:'REGON'}, id2Ph:'123456789',
+       requiresIBAN:true, extraToggles:[] },
+  BE:{ name:{it:'Belgio',en:'Belgium',nl:'België',de:'Belgien'}, currency:'EUR', vatRate:21, taxName:'BTW',
+       id1:{it:'Numero d\'impresa',en:'Enterprise Number',nl:'Ondernemingsnummer',de:'Unternehmensnummer'}, id1Ph:'0123.456.789',
+       id2:{it:'Partita IVA',en:'VAT ID',nl:'Btw-nummer',de:'USt-IdNr.'}, id2Ph:'BE0123456789',
+       requiresIBAN:true, extraToggles:[] },
+  AT:{ name:{it:'Austria',en:'Austria',nl:'Oostenrijk',de:'Österreich'}, currency:'EUR', vatRate:20, taxName:'USt',
+       id1:{it:'Steuernummer',en:'Tax Number',de:'Steuernummer'}, id1Ph:'12 345/6789',
+       id2:{it:'UID',en:'VAT ID',de:'UID-Nummer'}, id2Ph:'ATU12345678',
+       requiresIBAN:true, extraToggles:[] },
+  IE:{ name:{it:'Irlanda',en:'Ireland',nl:'Ierland',de:'Irland'}, currency:'EUR', vatRate:23, taxName:'VAT',
+       id1:{it:'Tax Reference',en:'Tax Reference'}, id1Ph:'1234567T',
+       id2:{it:'VAT Number',en:'VAT Number'}, id2Ph:'IE1234567T',
+       requiresIBAN:true, extraToggles:[] },
   SE:{ name:{it:'Svezia',en:'Sweden'}, currency:'SEK', vatRate:25, taxName:'Moms',
        id1:{it:'Org. nummer',en:'Org. Number'}, id1Ph:'556123-4567',
        id2:{it:'Moms-nr.',en:'VAT Number'}, id2Ph:'SE123456789001',
@@ -1315,8 +1368,32 @@ let itemIdx  = 0;
 
 // ── HELPERS ───────────────────────────────────────────────────────────
 function t(k) { return L[S.lang][k] || L.it[k] || k; }
-function sym() { return { EUR:'€', USD:'$', GBP:'£', CHF:'Fr.', AUD:'A$', CAD:'C$', DKK:'kr', SEK:'kr', NOK:'kr' }[S.settings.currency] || '€'; }
-function fmt(n) { return `${sym()} ${parseFloat(n||0).toFixed(2)}`; }
+function sym() { return { EUR:'€', USD:'$', GBP:'£', CHF:'Fr.', AUD:'A$', CAD:'C$', DKK:'kr', SEK:'kr', NOK:'kr', PLN:'zł' }[S.settings.currency] || '€'; }
+const LOCALES = { it:'it-IT', en:'en-GB', nl:'nl-NL', de:'de-DE' };
+// jsPDF's built-in fonts lack U+202F/U+2212, which some locales emit
+function cleanNum(s) { return s.replace(/\u202F/g, '\u00A0').replace(/\u2212/g, '-'); }
+function fmt(n) {
+  const cur = S.settings.currency || 'EUR';
+  try { return cleanNum(new Intl.NumberFormat(LOCALES[S.lang] || 'en-GB', { style: 'currency', currency: cur }).format(parseFloat(n || 0))); }
+  catch { return `${sym()} ${parseFloat(n || 0).toFixed(2)}`; }
+}
+function fmtPlain(n) {
+  return cleanNum(new Intl.NumberFormat(LOCALES[S.lang] || 'en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: false }).format(parseFloat(n || 0)));
+}
+// Render an invoice in its own language and currency, then restore the UI's
+function withInvoiceContext(inv, fn) {
+  const lang = S.lang, cur = S.settings.currency;
+  if (inv.docLang && L[inv.docLang]) S.lang = inv.docLang;
+  if (inv.currency) S.settings.currency = inv.currency;
+  try { return fn(); } finally { S.lang = lang; S.settings.currency = cur; }
+}
+function docTypeLabel(sellerCountry) {
+  if (S.lang === 'it' && sellerCountry && sellerCountry !== 'IT') return t('pdf_invoice_it');
+  return t('pdf_type');
+}
+function clientLink(inv) {
+  return inv.publicToken ? `${location.origin}${location.pathname}?token=${inv.publicToken}` : '';
+}
 function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 function fmtDate(d) {
   if (!d) return '';
@@ -1387,7 +1464,7 @@ function setLang(l) {
 }
 
 // ── COUNTRY / VAT LOGIC ───────────────────────────────────────────────
-const COUNTRY_FLAGS = {IT:'🇮🇹',NL:'🇳🇱',DE:'🇩🇪',GB:'🇬🇧',FR:'🇫🇷',ES:'🇪🇸',PT:'🇵🇹',CH:'🇨🇭',SE:'🇸🇪',US:'🇺🇸',CA:'🇨🇦',AU:'🇦🇺'};
+const COUNTRY_FLAGS = {IT:'🇮🇹',NL:'🇳🇱',DE:'🇩🇪',GB:'🇬🇧',FR:'🇫🇷',ES:'🇪🇸',PT:'🇵🇹',CH:'🇨🇭',SE:'🇸🇪',US:'🇺🇸',CA:'🇨🇦',AU:'🇦🇺',PL:'🇵🇱',BE:'🇧🇪',AT:'🇦🇹',IE:'🇮🇪'};
 function onCountryChange(userChanged = false) {
   const code = document.getElementById('s-country')?.value || S.settings.country || 'IT';
   const c    = COUNTRIES[code] || COUNTRIES.IT;
@@ -1629,7 +1706,9 @@ async function doLogin() {
     document.getElementById('login-form-wrap').classList.add('hidden');
     document.getElementById('login-sent').classList.remove('hidden');
   } catch (err) {
-    errEl.textContent = (err.message || 'Failed to send magic link.') + (err.status ? ' ['+err.status+']' : '');
+    errEl.textContent = /fetch|load failed|network/i.test(err.message || '')
+      ? t('err_offline')
+      : (err.message || 'Failed to send magic link.') + (err.status ? ' ['+err.status+']' : '');
     console.error('OTP error full:', JSON.stringify(err));
     errEl.classList.remove('hidden');
     btn.disabled = false;
@@ -1767,6 +1846,9 @@ function dbToInv(r) {
     freelancerIban: r.freelancer_iban  || '',
     freelancerName: r.freelancer_name  || '',
     payLink:        r.pay_link         || '',
+    docLang:        (r.meta && r.meta.lang)     || '',
+    currency:       (r.meta && r.meta.currency) || '',
+    sellerCountry:  (r.meta && r.meta.country)  || '',
     createdAt:      r.created_at,
   };
 }
@@ -1791,6 +1873,7 @@ function invToDb(inv) {
     freelancer_iban:  S.settings.iban      || null,
     freelancer_name:  S.settings.name      || null,
     pay_link:         inv.payLink          || null,
+    meta:             { lang: inv.docLang || S.lang, currency: S.settings.currency || 'EUR', country: S.settings.country || 'IT' },
     created_at:       inv.createdAt,
   };
 }
@@ -1896,9 +1979,21 @@ function addItem(desc='', hours='', rate='') {
   const r  = rate || S.settings.defaultRate;
   document.getElementById('items-box').insertAdjacentHTML('beforeend', `
     <div id="row-${id}" class="grid grid-cols-[1fr_80px_80px_28px] gap-2 items-center">
-      <input type="text"   id="d-${id}" value="${desc}"  class="ifield text-sm py-3" placeholder="${t('ph_item')}" oninput="recalc()" required>
-      <input type="number" id="h-${id}" value="${hours}" class="ifield text-sm py-3" placeholder="0" min="0.25" step="0.25" oninput="recalc()">
-      <input type="number" id="r-${id}" value="${r}"     class="ifield text-sm py-3" placeholder="50" min="1" oninput="recalc()">
+      <input type="text"   id="d-${id}" value="${esc(desc)}"  class="ifield text-sm py-3" placeholder="${esc(t('ph_item'))}" oninput="recalc()" required>
+      <input type="number" id="h-${id}" value="${esc(String(hours))}" class="ifield text-sm py-3" placeholder="0" min="0.25" step="0.25" oninput="recalc()">
+      <input type="number" id="r-${id}" value="${esc(String(r))}"     class="ifield text-sm py-3" placeholder="50" min="1" oninput="recalc()">
+      <button type="button" onclick="delItem(${id})" class="text-gray-600 hover:text-red-400 transition text-xl leading-none">×</button>
+    </div>`);
+  recalc();
+}
+
+function addDiscount(desc = '', amount = '') {
+  itemIdx++;
+  const id = itemIdx;
+  document.getElementById('items-box').insertAdjacentHTML('beforeend', `
+    <div id="row-${id}" data-discount="1" class="grid grid-cols-[1fr_168px_28px] gap-2 items-center">
+      <input type="text"   id="d-${id}" value="${esc(desc || t('lbl_discount'))}" class="ifield text-sm py-3 text-red-300" oninput="recalc()" required>
+      <input type="number" id="a-${id}" value="${esc(String(amount))}" class="ifield text-sm py-3 text-red-300" placeholder="- 0" min="0.01" step="0.01" oninput="recalc()">
       <button type="button" onclick="delItem(${id})" class="text-gray-600 hover:text-red-400 transition text-xl leading-none">×</button>
     </div>`);
   recalc();
@@ -1913,13 +2008,15 @@ function recalc() {
   let subtotal = 0;
   document.querySelectorAll('[id^="row-"]').forEach(row => {
     const n = row.id.split('-')[1];
+    if (row.dataset.discount) { subtotal -= parseFloat(document.getElementById(`a-${n}`)?.value) || 0; return; }
     subtotal += (parseFloat(document.getElementById(`h-${n}`)?.value)||0) *
                 (parseFloat(document.getElementById(`r-${n}`)?.value)||0);
   });
 
   const vatEnabled = S.settings.vatEnabled && !S.settings.kleinunternehmer && !S.settings.autoentrepreneur;
-  const domRate    = parseFloat(document.getElementById('s-vat-rate')?.value);
-  const vatPct     = vatEnabled ? ((!isNaN(domRate) ? domRate : null) ?? S.settings.vatOnInvoice ?? 22) : 0;
+  // Use the saved rate: the Settings input is filled with the first country's default until Settings is opened
+  const savedRate  = parseFloat(S.settings.vatOnInvoice);
+  const vatPct     = vatEnabled ? (Number.isFinite(savedRate) ? savedRate : ((COUNTRIES[S.settings.country] || COUNTRIES.IT).vatRate)) : 0;
   const vatAmt     = subtotal * vatPct / 100;
   const ritenuta   = S.settings.ritenuta ? subtotal * 0.20 : 0;
   const total      = subtotal + vatAmt - ritenuta;
@@ -1951,6 +2048,11 @@ function getItems() {
   document.querySelectorAll('[id^="row-"]').forEach(row => {
     const n = row.id.split('-')[1];
     const d = document.getElementById(`d-${n}`)?.value || '';
+    if (row.dataset.discount) {
+      const a = parseFloat(document.getElementById(`a-${n}`)?.value) || 0;
+      if (d && a > 0) items.push({ desc: d, hours: 1, rate: -a, amount: -a, discount: true });
+      return;
+    }
     const h = parseFloat(document.getElementById(`h-${n}`)?.value) || 0;
     const r = parseFloat(document.getElementById(`r-${n}`)?.value) || 0;
     if (d && h > 0 && r > 0) items.push({ desc: d, hours: h, rate: r, amount: h * r });
@@ -1965,6 +2067,7 @@ function initInvForm() {
   document.getElementById('in-issue').value = today;
   document.getElementById('in-due').value   = dd.toISOString().split('T')[0];
   document.getElementById('in-notes').value = S.settings.terms || '';
+  document.getElementById('in-lang').value  = S.lang;
 }
 
 // ── GENERATE INVOICE ──────────────────────────────────────────────────
@@ -1982,6 +2085,7 @@ async function generateInvoice(e) {
   btn.textContent = '...';
 
   const { subtotal, vatAmt, vatPct, ritenuta, total } = recalc();
+  if (subtotal <= 0) { toast('⚠️', t('t_neg')); btn.disabled = false; btn.textContent = t('btn_gen'); return; }
   const code = S.settings.country || 'IT';
   const c    = COUNTRIES[code] || COUNTRIES.IT;
   const inv = {
@@ -1992,6 +2096,7 @@ async function generateInvoice(e) {
     dueDate:        document.getElementById('in-due').value,
     notes:          document.getElementById('in-notes').value.trim(),
     payLink,
+    docLang:        document.getElementById('in-lang').value,
     items,
     subtotal:       subtotal.toFixed(2),
     vatAmount:      vatAmt.toFixed(2),
@@ -2007,10 +2112,11 @@ async function generateInvoice(e) {
     const row = invToDb(inv);
     let { data, error } = await _sb.from('invoices').insert([row]).select().single();
     // Older databases lack the newer columns; save without them rather than fail.
-    if (error && /freelancer_|pay_link/.test(error.message || '')) {
+    if (error && /freelancer_|pay_link|meta/.test(error.message || '')) {
       delete row.freelancer_iban;
       delete row.freelancer_name;
       delete row.pay_link;
+      delete row.meta;
       ({ data, error } = await _sb.from('invoices').insert([row]).select().single());
     }
     if (error) throw error;
@@ -2068,6 +2174,9 @@ async function loadClientView(token) {
     if (!data) throw new Error('Invoice not found');
 
     const inv = dbToInv(data);
+    if (inv.docLang && L[inv.docLang]) { S.lang = inv.docLang; applyTr(); }
+    if (inv.currency) S.settings.currency = inv.currency;
+    document.querySelector('[data-i18n="cv_lbl"]').textContent = docTypeLabel(inv.sellerCountry);
 
     document.getElementById('cv-id').textContent    = inv.id;
     document.getElementById('cv-from').textContent  = inv.freelancerName || 'Freelancer';
@@ -2098,7 +2207,7 @@ async function loadClientView(token) {
       <div class="flex justify-between items-center py-2.5 border-b border-gray-100 text-sm last:border-0">
         <div>
           <div class="font-bold text-gray-800">${esc(it.desc)}</div>
-          ${it.hours ? `<div class="text-gray-400 text-xs">${esc(String(it.hours))}h × ${sym()}${esc(String(it.rate))}</div>` : ''}
+          ${it.hours && !it.discount ? `<div class="text-gray-400 text-xs">${esc(String(it.hours))}h × ${esc(fmt(it.rate))}</div>` : ''}
         </div>
         <div class="font-black text-gray-900 whitespace-nowrap pl-3">${fmt(it.amount)}</div>
       </div>`).join('');
@@ -2190,15 +2299,21 @@ function renderClientPay(inv) {
   const bank = document.getElementById('cv-bank');
   bank.classList.toggle('hidden', !iban);
   if (!iban) return;
-  try {
-    drawEpcQr(document.getElementById('cv-qr-canvas'),
-      buildEpcString(iban, inv.freelancerName || '', inv.total, inv.id), 280);
-  } catch { document.getElementById('cv-qr-canvas').classList.add('hidden'); }
+  // EPC QR codes only carry euro amounts
+  const qrBlock = document.getElementById('cv-qr-canvas').parentElement;
+  const isEur = (inv.currency || 'EUR') === 'EUR';
+  qrBlock.classList.toggle('hidden', !isEur);
+  if (isEur) {
+    try {
+      drawEpcQr(document.getElementById('cv-qr-canvas'),
+        buildEpcString(iban, inv.freelancerName || '', inv.total, inv.id), 280);
+    } catch { qrBlock.classList.add('hidden'); }
+  }
 
   const rows = [
     ['IBAN', iban.replace(/(.{4})/g, '$1 ').trim(), iban],
     [t('pdf_benef'), inv.freelancerName, inv.freelancerName],
-    [t('pay_amount'), fmt(inv.total), parseFloat(inv.total || 0).toFixed(2)],
+    [t('pay_amount'), fmt(inv.total), fmtPlain(inv.total)],
     [t('pdf_ref'), inv.id, inv.id],
   ].filter(r => r[2]);
   const box = document.getElementById('cv-bank-rows');
@@ -2237,6 +2352,7 @@ function getStatus(inv) {
 }
 
 function renderDash() {
+  renderBtwCard();
   const total    = S.invoices.length;
   const pending  = S.invoices.filter(i => getStatus(i) === 'pending').length;
   const overdue  = S.invoices.filter(i => getStatus(i) === 'overdue').length;
@@ -2301,6 +2417,90 @@ function renderDash() {
       </div>
     </div>`;
   }).join('');
+}
+
+// ── BTW / VAT QUARTER ─────────────────────────────────────────────────
+// NL: quarterly return due the last day of the month after the quarter.
+function btwFiling(today = new Date()) {
+  const y = today.getFullYear(), q = Math.floor(today.getMonth() / 3);
+  const prevDeadline = new Date(y, q * 3 + 1, 0, 23, 59, 59);
+  if (today <= prevDeadline) return { year: q === 0 ? y - 1 : y, q: (q + 3) % 4, deadline: prevDeadline };
+  return { year: y, q, deadline: new Date(y, q * 3 + 4, 0, 23, 59, 59) };
+}
+
+function renderBtwCard() {
+  const card = document.getElementById('btw-card');
+  if (!card) return;
+  const vatOn = S.settings.vatEnabled && !S.settings.kleinunternehmer && !S.settings.autoentrepreneur;
+  if (!vatOn) { card.classList.add('hidden'); return; }
+  const isNL = (S.settings.country || 'IT') === 'NL';
+  const f = btwFiling();
+  const cur = S.settings.currency || 'EUR';
+  const inQ = S.invoices.filter(i => {
+    if (!i.issueDate || (i.currency && i.currency !== cur)) return false;
+    const d = new Date(i.issueDate + 'T12:00:00');
+    return d.getFullYear() === f.year && Math.floor(d.getMonth() / 3) === f.q;
+  });
+  const rev = inQ.reduce((a, i) => a + parseFloat(i.subtotal || i.total || 0), 0);
+  const vat = inQ.reduce((a, i) => a + parseFloat(i.vatAmount || 0), 0);
+  const days = Math.ceil((f.deadline - new Date()) / 86400000);
+  const urgent = isNL && days <= 14;
+  const dl = f.deadline.toISOString().slice(0, 10);
+  const daysTxt = days <= 0 ? t('btw_today') : `${days} ${t('btw_days')}`;
+  card.style.borderColor = urgent ? 'rgba(239,68,68,.5)' : '';
+  card.innerHTML = `
+    <div class="flex items-start justify-between gap-4 flex-wrap">
+      <div>
+        <div class="text-[10px] text-gray-500 uppercase font-bold tracking-widest mb-1">${esc(t('btw_title'))} · Q${f.q + 1} ${f.year}</div>
+        ${isNL ? `<div class="text-sm ${urgent ? 'text-red-400' : 'text-gray-300'} font-bold">${esc(t('btw_due'))} ${esc(fmtDate(dl))} · ${esc(daysTxt)}</div>
+        <div class="text-[11px] text-gray-600 mt-1">${esc(t('btw_zero'))}</div>` : ''}
+      </div>
+      <div class="flex gap-6 text-right">
+        <div><div class="text-[10px] text-gray-500 uppercase font-bold tracking-widest mb-1">${esc(t('btw_rev'))}</div><div class="text-lg font-black">${esc(fmt(rev))}</div></div>
+        <div><div class="text-[10px] text-gray-500 uppercase font-bold tracking-widest mb-1">${esc(t('btw_vat'))}</div><div class="text-lg font-black text-accent">${esc(fmt(vat))}</div></div>
+      </div>
+    </div>
+    ${isNL ? `<div class="flex gap-2 flex-wrap mt-4">
+      <button type="button" onclick="downloadTaxCalendar()" class="btn-o text-[11px] py-2 px-3">📅 ${esc(t('btw_cal'))}</button>
+      <a href="https://mijnzakelijk.belastingdienst.nl" target="_blank" rel="noopener" class="btn-o text-[11px] py-2 px-3">${esc(t('btw_portal'))} ↗</a>
+    </div>` : ''}`;
+  card.classList.remove('hidden');
+}
+
+function downloadTaxCalendar() {
+  const ics = s => String(s).replace(/\\/g, '\\\\').replace(/[,;]/g, m => '\\' + m).replace(/\n/g, '\\n');
+  const ymd = d => `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
+  const events = [];
+  let { year, q, deadline } = btwFiling();
+  for (let i = 0; i < 4; i++) {
+    events.push({ date: deadline, title: `${t('ics_btw')} Q${q + 1} ${year}` });
+    q++; if (q > 3) { q = 0; year++; }
+    deadline = new Date(year, q * 3 + 4, 0);
+  }
+  const now = new Date();
+  let ib = new Date(now.getFullYear(), 4, 1);
+  if (now > ib) ib = new Date(now.getFullYear() + 1, 4, 1);
+  events.push({ date: ib, title: `${t('ics_ib')} ${ib.getFullYear() - 1}` });
+
+  const stamp = now.toISOString().replace(/[-:]/g, '').replace(/\.\d+/, '');
+  const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//DuFattur//Tax deadlines//EN', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH'];
+  events.forEach(e => {
+    const next = new Date(e.date.getFullYear(), e.date.getMonth(), e.date.getDate() + 1);
+    lines.push('BEGIN:VEVENT', `UID:${ymd(e.date)}-${e.title.replace(/\W+/g, '-')}@dufattur.nl`, `DTSTAMP:${stamp}`,
+      `DTSTART;VALUE=DATE:${ymd(e.date)}`, `DTEND;VALUE=DATE:${ymd(next)}`, `SUMMARY:${ics(e.title)}`,
+      `DESCRIPTION:${ics(t('ics_note') + ' https://mijnzakelijk.belastingdienst.nl')}`,
+      'BEGIN:VALARM', 'ACTION:DISPLAY', 'TRIGGER:-P7D', `DESCRIPTION:${ics(e.title)}`, 'END:VALARM',
+      'BEGIN:VALARM', 'ACTION:DISPLAY', 'TRIGGER:-P1D', `DESCRIPTION:${ics(e.title)}`, 'END:VALARM',
+      'END:VEVENT');
+  });
+  lines.push('END:VCALENDAR');
+  const blob = new Blob([lines.join('\r\n') + '\r\n'], { type: 'text/calendar;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'dufattur-tax-deadlines.ics';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  toast('📅', t('t_ics'));
 }
 
 async function markPaid(id) {
@@ -2523,232 +2723,235 @@ async function clearData() {
 function exportPDF(id) {
   const inv = S.invoices.find(i => i.id === id);
   if (!inv || !window.jspdf) { toast('⚠️', 'jsPDF not loaded'); return; }
+  withInvoiceContext(inv, () => buildInvoicePDF(inv).save(`${inv.id}.pdf`));
+  toast('📄', t('t_pdf'));
+}
+
+function buildInvoicePDF(inv) {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-  const W = 210, H = 297, M = 18;
-  let y = M;
+  const W = 210, H = 297, M = 18, R = W - M;
 
   let themeKey = DEFAULT_THEME;
   try { themeKey = localStorage.getItem('df_theme') || DEFAULT_THEME; } catch(_) {}
-  const theme = THEMES.find(th => th.key === themeKey) || THEMES[0];
+  const theme  = THEMES.find(th => th.key === themeKey) || THEMES[0];
   const accent = theme.rgb.split(',').map(Number);
-  const accentFg = theme.fg === '#fff' ? [255,255,255] : [0,0,0];
+  const accentText = theme.key === 'white' ? [17,17,17] : accent;
+  const tint   = accent.map(c => Math.round(255 - (255 - c) * 0.09));
+  const INK = [17,17,17], MUTE = [128,128,128], RULE = [226,226,226];
   const sender = S.settings.name || S.settings.email || 'Freelancer';
+  const code   = inv.sellerCountry || S.settings.country || 'IT';
+  const ctry   = COUNTRIES[code] || COUNTRIES.IT;
 
-  // Slim header: the freelancer's own name, document type and number
-  doc.setFillColor(...accent);
-  doc.rect(0, 0, W, 3, 'F');
-  let nameX = M;
-  const logo = safeLogo(S.settings.logo);
-  if (logo) {
-    try {
-      const { width, height } = doc.getImageProperties(logo);
-      const s = Math.min(40 / width, 14 / height);
-      const lw = width * s, lh = height * s;
-      doc.addImage(logo, 'PNG', M, 15 - lh / 2, lw, lh);
-      nameX = M + lw + 5;
-    } catch (_) {}
-  }
-  doc.setFontSize(18); doc.setFont('helvetica','bold'); doc.setTextColor(15,15,15);
-  doc.text(doc.splitTextToSize(sender, 150 - nameX)[0], nameX, 20);
-  doc.setFontSize(8); doc.setFont('helvetica','bold'); doc.setTextColor(130,130,130);
-  doc.text(t('pdf_type'), W-M, 14, {align:'right'});
-  doc.setFontSize(13); doc.setTextColor(15,15,15);
-  doc.text(inv.id, W-M, 20, {align:'right'});
-  doc.setDrawColor(230,230,230); doc.setLineWidth(0.3);
-  doc.line(M, 27, W-M, 27);
-
-  const code = S.settings.country || 'IT';
-  const ctry = COUNTRIES[code] || COUNTRIES.IT;
-
-  y = 36;
-  doc.setFontSize(7.5); doc.setFont('helvetica','bold'); doc.setTextColor(140,140,140);
-  doc.text(t('pdf_from'), M, y); doc.text(t('pdf_to'), 112, y);
-  y += 5;
-  doc.setFontSize(11); doc.setFont('helvetica','bold'); doc.setTextColor(20,20,20);
-  doc.text(S.settings.name || S.settings.email || 'Freelancer', M, y);
-  doc.text(inv.client, 112, y);
-  y += 5;
-  doc.setFontSize(8.5); doc.setFont('helvetica','normal'); doc.setTextColor(90,90,90);
-  const id1Lbl = ctry.id1[S.lang] || ctry.id1.en;
-  if (S.settings.vat)  doc.text(`${id1Lbl}: ${S.settings.vat}`, M, y);
-  if (S.settings.vat2) { y += 4; const id2Lbl = ctry.id2[S.lang] || ctry.id2.en; doc.text(`${id2Lbl}: ${S.settings.vat2}`, M, y); }
-  if (S.settings.address) { y += 4; doc.text(S.settings.address, M, y); }
-  if (inv.clientEmail) doc.text(inv.clientEmail, 112, y-4);
-  if (S.settings.iban) { y += 4; doc.text(`${t('pdf_iban')}: ${S.settings.iban}`, M, y); }
-  y += 13;
-
-  // Legal notice for special regimes
-  const legalMap = {
-    kleinunternehmer: {
-      it: 'Operazione effettuata ai sensi dell\'art. §19 UStG. IVA non applicata.',
-      en: 'Pursuant to §19 UStG (German Small Business Regulation), no VAT charged.',
-      de: 'Gemäß §19 UStG wird keine Umsatzsteuer berechnet.'
-    },
-    autoentrepreneur: {
-      it: 'TVA non applicable, art. 293 B du CGI.',
-      en: 'TVA not applicable, art. 293 B CGI (French auto-entrepreneur regime).',
-      fr: 'TVA non applicable, art. 293 B du CGI.'
-    },
-    ritenuta: {
-      it: 'Compenso soggetto a ritenuta d\'acconto del 20% ai sensi dell\'art. 25 DPR 600/73.',
-      en: 'Subject to 20% withholding tax (Italian ritenuta d\'acconto, art. 25 DPR 600/73).'
-    }
+  const small = (txt, x, y, opts) => {
+    doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(...MUTE);
+    doc.text(txt, x, y, opts);
   };
-  const lgl = S.lang;
-  let legalNotice = '';
-  if (S.settings.kleinunternehmer) legalNotice = legalMap.kleinunternehmer[lgl] || legalMap.kleinunternehmer.en;
-  if (S.settings.autoentrepreneur) legalNotice = legalMap.autoentrepreneur[lgl] || legalMap.autoentrepreneur.en;
-  if (S.settings.ritenuta)         legalNotice = (legalNotice ? legalNotice + ' ' : '') + (legalMap.ritenuta[lgl] || legalMap.ritenuta.en);
-  if (legalNotice) {
-    doc.setFontSize(7.5); doc.setFont('helvetica','bolditalic'); doc.setTextColor(120,120,120);
-    doc.text(doc.splitTextToSize(legalNotice, W-2*M), M, y);
-    y += 6;
+
+  const header = () => {
+    doc.setFillColor(...accent);
+    doc.rect(0, 0, W, 3, 'F');
+    let nameX = M;
+    const logo = safeLogo(S.settings.logo);
+    if (logo) {
+      try {
+        const { width, height } = doc.getImageProperties(logo);
+        const k = Math.min(40 / width, 14 / height);
+        doc.addImage(logo, 'PNG', M, 15 - height * k / 2, width * k, height * k);
+        nameX = M + width * k + 5;
+      } catch (_) {}
+    }
+    doc.setFont('helvetica','bold'); doc.setFontSize(17); doc.setTextColor(...INK);
+    doc.text(doc.splitTextToSize(sender, 140 - nameX)[0], nameX, 20);
+    small(docTypeLabel(code), R, 14, { align: 'right' });
+    doc.setFontSize(13); doc.setTextColor(...INK);
+    doc.text(inv.id, R, 20.5, { align: 'right' });
+    doc.setDrawColor(...RULE); doc.setLineWidth(0.3);
+    doc.line(M, 27, R, 27);
+  };
+  header();
+
+  // Amount due at a glance
+  let y = 33;
+  doc.setFillColor(...tint);
+  doc.roundedRect(M, y, W - 2*M, 24, 3, 3, 'F');
+  small(t('pdf_amount_due'), M + 6, y + 8.5);
+  doc.setFont('helvetica','bold'); doc.setFontSize(20); doc.setTextColor(...accentText);
+  doc.text(fmt(inv.total), M + 6, y + 18);
+  const dateCol = (label, value, x) => {
+    small(label, x, y + 8.5);
+    doc.setFont('helvetica','bold'); doc.setFontSize(10.5); doc.setTextColor(...INK);
+    doc.text(value || '-', x, y + 16.5);
+  };
+  dateCol(t('pdf_date'), fmtDate(inv.issueDate), 116);
+  if (inv.dueDate) dateCol(t('pdf_due'), fmtDate(inv.dueDate), 154);
+  y += 35;
+
+  // From / To
+  small(t('pdf_from'), M, y); small(t('pdf_to'), 116, y);
+  y += 5.5;
+  doc.setFont('helvetica','bold'); doc.setFontSize(10.5); doc.setTextColor(...INK);
+  doc.text(doc.splitTextToSize(sender, 90)[0], M, y);
+  doc.text(doc.splitTextToSize(inv.client || '', 76)[0], 116, y);
+  doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(85,85,85);
+  let yl = y + 5, yr = y + 5;
+  const id1 = ctry.id1[S.lang] || ctry.id1.en, id2 = ctry.id2[S.lang] || ctry.id2.en;
+  if (S.settings.vat)  { doc.text(`${id1}: ${S.settings.vat}`, M, yl); yl += 4.2; }
+  if (S.settings.vat2) { doc.text(`${id2}: ${S.settings.vat2}`, M, yl); yl += 4.2; }
+  if (S.settings.address) {
+    const a = doc.splitTextToSize(S.settings.address, 90);
+    doc.text(a, M, yl); yl += a.length * 4.2;
   }
+  if (S.settings.email) { doc.text(S.settings.email, M, yl); yl += 4.2; }
+  if (inv.clientEmail) { doc.text(inv.clientEmail, 116, yr); yr += 4.2; }
+  y = Math.max(yl, yr) + 7;
 
-  doc.setFontSize(7.5); doc.setFont('helvetica','bold'); doc.setTextColor(140,140,140);
-  doc.text(`${t('pdf_date')}: ${fmtDate(inv.issueDate)||'-'}`, M, y);
-  if (inv.dueDate) doc.text(`${t('pdf_due')}: ${fmtDate(inv.dueDate)}`, 95, y);
-  y += 10;
+  // Special tax regimes need a legal line on the invoice
+  const legalMap = {
+    kleinunternehmer: { it: 'Operazione effettuata ai sensi del §19 UStG. IVA non applicata.', en: 'Pursuant to §19 UStG (German small business regulation), no VAT charged.', de: 'Gemäß §19 UStG wird keine Umsatzsteuer berechnet.' },
+    autoentrepreneur: { it: 'TVA non applicable, art. 293 B du CGI.', en: 'TVA not applicable, art. 293 B CGI (French auto-entrepreneur regime).' },
+    ritenuta: { it: 'Compenso soggetto a ritenuta d\'acconto del 20% ai sensi dell\'art. 25 DPR 600/73.', en: 'Subject to 20% withholding tax (Italian ritenuta d\'acconto, art. 25 DPR 600/73).' }
+  };
+  const legal = [];
+  if (S.settings.kleinunternehmer) legal.push(legalMap.kleinunternehmer[S.lang] || legalMap.kleinunternehmer.en);
+  if (S.settings.autoentrepreneur) legal.push(legalMap.autoentrepreneur[S.lang] || legalMap.autoentrepreneur.en);
+  if (S.settings.ritenuta)         legal.push(legalMap.ritenuta[S.lang] || legalMap.ritenuta.en);
 
-  doc.setFillColor(235,235,235);
-  doc.rect(M, y-3.5, W-2*M, 9, 'F');
-  doc.setFontSize(7.5); doc.setFont('helvetica','bold'); doc.setTextColor(60,60,60);
-  doc.text(t('pdf_desc'), M+2, y+2);
-  doc.text(t('pdf_h'),  134, y+2);
-  doc.text(t('pdf_r'),  155, y+2);
-  doc.text(t('pdf_amt'), W-M-1, y+2, {align:'right'});
-  y += 9;
-
-  doc.setFont('helvetica','normal'); doc.setTextColor(30,30,30);
-  inv.items.forEach((it, idx) => {
-    // Truncate description to fit column (max ~55 chars)
-    const descStr = String(it.desc||'').substring(0, 55);
-    if (idx%2===1) { doc.setFillColor(248,248,248); doc.rect(M, y-3.5, W-2*M, 9, 'F'); }
-    doc.setFontSize(9);
-    doc.text(descStr,                          M+2,    y+2);
-    doc.text(String(it.hours),                 134,    y+2);
-    doc.text(`${sym()}${it.rate}`,              155,    y+2);
-    doc.text(`${sym()}${it.amount.toFixed(2)}`, W-M-1, y+2, {align:'right'});
-    y += 9;
-    // Page break check
-    if (y > 260) { doc.addPage(); y = M; }
+  // Line items
+  const X_QTY = 136, X_RATE = 162;
+  const tableHead = () => {
+    small(t('pdf_desc'), M, y);
+    small(t('pdf_h'), X_QTY, y, { align: 'right' });
+    small(t('pdf_r'), X_RATE, y, { align: 'right' });
+    small(t('pdf_amt'), R, y, { align: 'right' });
+    y += 2.5;
+    doc.setDrawColor(...INK); doc.setLineWidth(0.4); doc.line(M, y, R, y);
+    y += 5.5;
+  };
+  tableHead();
+  (inv.items || []).forEach(it => {
+    doc.setFont('helvetica','normal'); doc.setFontSize(9.5);
+    const lines = doc.splitTextToSize(String(it.desc || ''), 98);
+    const rowH = lines.length * 4.4 + 3.6;
+    if (y + rowH > H - 30) { doc.addPage(); header(); y = 36; tableHead(); }
+    doc.setFont('helvetica','normal'); doc.setFontSize(9.5);
+    doc.setTextColor(...(it.discount ? [190,60,60] : INK));
+    doc.text(lines, M, y);
+    if (!it.discount) {
+      doc.setTextColor(85,85,85);
+      doc.text(String(it.hours), X_QTY, y, { align: 'right' });
+      doc.text(fmt(it.rate), X_RATE, y, { align: 'right' });
+      doc.setTextColor(...INK);
+    }
+    doc.setFont('helvetica','bold');
+    doc.text(fmt(it.amount), R, y, { align: 'right' });
+    y += rowH;
+    doc.setDrawColor(...RULE); doc.setLineWidth(0.2); doc.line(M, y - 3.2, R, y - 3.2);
   });
   y += 3;
 
-  // Subtotal / VAT / Ritenuta breakdown
-  const hasBreakdown = inv.vatAmount > 0 || inv.ritenuteAmount > 0;
-  if (hasBreakdown) {
-    doc.setFillColor(248,248,248);
-    doc.rect(M, y-2, W-2*M, 8, 'F');
-    doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(80,80,80);
-    doc.text(t('pdf_subtotal'), M+4, y+3);
-    doc.text(`${sym()} ${parseFloat(inv.subtotal||inv.total).toFixed(2)}`, W-M-3, y+3, {align:'right'});
-    y += 8;
-    if (parseFloat(inv.vatAmount) > 0) {
-      doc.setFillColor(252,252,252);
-      doc.rect(M, y-2, W-2*M, 8, 'F');
-      doc.text(`${inv.taxName||ctry.taxName} ${inv.vatRate}%`, M+4, y+3);
-      doc.text(`${sym()} ${parseFloat(inv.vatAmount).toFixed(2)}`, W-M-3, y+3, {align:'right'});
-      y += 8;
-    }
-    if (parseFloat(inv.ritenuteAmount) > 0) {
-      doc.setFillColor(255,248,248);
-      doc.rect(M, y-2, W-2*M, 8, 'F');
-      doc.setTextColor(180,60,60);
-      doc.text(t('pdf_ritenuta') + ' (20%)', M+4, y+3);
-      doc.text(`- ${sym()} ${parseFloat(inv.ritenuteAmount).toFixed(2)}`, W-M-3, y+3, {align:'right'});
-      doc.setTextColor(80,80,80);
-      y += 8;
-    }
-    y += 2;
+  // Totals, right-aligned
+  if (y > H - 60) { doc.addPage(); header(); y = 36; }
+  const TL = 118;
+  const totalRow = (label, value, color) => {
+    doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(...MUTE);
+    doc.text(label, TL, y);
+    doc.setTextColor(...(color || INK));
+    doc.text(value, R, y, { align: 'right' });
+    y += 5.5;
+  };
+  const hasTax = parseFloat(inv.vatAmount) > 0 || parseFloat(inv.ritenuteAmount) > 0;
+  if (hasTax) {
+    totalRow(t('pdf_subtotal'), fmt(inv.subtotal || inv.total));
+    if (parseFloat(inv.vatAmount) > 0) totalRow(`${inv.taxName || ctry.taxName} ${inv.vatRate}%`, fmt(inv.vatAmount));
+    if (parseFloat(inv.ritenuteAmount) > 0) totalRow(`${t('pdf_ritenuta')} 20%`, `- ${fmt(inv.ritenuteAmount)}`, [190,60,60]);
+  }
+  doc.setDrawColor(...INK); doc.setLineWidth(0.4); doc.line(TL, y - 1.5, R, y - 1.5);
+  y += 5;
+  doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(...INK);
+  doc.text(t('pdf_tot'), TL, y);
+  doc.setFontSize(14); doc.setTextColor(...accentText);
+  doc.text(fmt(inv.total), R, y + 0.5, { align: 'right' });
+  y += 12;
+
+  // Notes and legal lines
+  const notes = [inv.notes, ...legal].filter(Boolean).join('\n');
+  if (notes) {
+    const nl = doc.splitTextToSize(notes, W - 2*M);
+    if (y + nl.length * 3.8 + 8 > H - 20) { doc.addPage(); header(); y = 36; }
+    small(t('pdf_notes'), M, y); y += 4.5;
+    doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(85,85,85);
+    doc.text(nl, M, y);
+    y += nl.length * 3.8 + 6;
   }
 
-  doc.setFillColor(...accent);
-  doc.roundedRect(M, y-2, W-2*M, 12, 2, 2, 'F');
-  doc.setFontSize(10); doc.setFont('helvetica','bold'); doc.setTextColor(...accentFg);
-  doc.text(t('pdf_tot'), M+4, y+6);
-  doc.setFontSize(12);
-  doc.text(`${sym()} ${parseFloat(inv.total).toFixed(2)}`, W-M-4, y+6, {align:'right'});
-  y += 18;
-
-  if (inv.notes) {
-    const noteLines = doc.splitTextToSize(inv.notes, W-2*M);
-    doc.setFontSize(7.5); doc.setFont('helvetica','bold'); doc.setTextColor(140,140,140);
-    doc.text(t('pdf_notes'), M, y); y += 4;
-    doc.setFont('helvetica','normal'); doc.setTextColor(90,90,90); doc.setFontSize(8);
-    doc.text(noteLines, M, y);
-    y += noteLines.length * 3.6 + 6;
-  }
-
-  // Payment box: bank details + SEPA QR, plus an optional one-tap link
+  // Payment: bank details, SEPA QR (euro only) and optional one-tap link
   const iban = (S.settings.iban || '').replace(/\s/g, '').toUpperCase();
   const payLink = safeHttpsUrl(inv.payLink);
   if ((iban || payLink) && inv.status !== 'paid') {
     const boxH = iban ? 42 : 16;
-    if (y + boxH > H - 16) { doc.addPage(); y = M; }
+    if (y + boxH > H - 16) { doc.addPage(); header(); y = 36; }
     doc.setFillColor(246,247,249);
-    doc.roundedRect(M, y, W-2*M, boxH, 3, 3, 'F');
+    doc.roundedRect(M, y, W - 2*M, boxH, 3, 3, 'F');
     let ty = y + 8;
-    doc.setFontSize(7.5); doc.setFont('helvetica','bold'); doc.setTextColor(140,140,140);
-    doc.text(t('pdf_pay'), M+5, ty);
+    small(t('pdf_pay'), M + 5, ty);
     ty += 6;
     if (iban) {
-      const rows = [
-        ['IBAN', iban.replace(/(.{4})/g, '$1 ').trim()],
-        [t('pdf_benef'), sender],
-        [t('pay_amount'), `${sym()} ${parseFloat(inv.total).toFixed(2)}`],
-        [t('pdf_ref'), inv.id],
-      ];
-      rows.forEach(([k, v]) => {
-        doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(120,120,120);
-        doc.text(k, M+5, ty);
-        doc.setFont('helvetica','bold'); doc.setTextColor(20,20,20);
-        doc.text(String(v), M+32, ty);
+      [['IBAN', iban.replace(/(.{4})/g, '$1 ').trim()], [t('pdf_benef'), sender],
+       [t('pay_amount'), fmt(inv.total)], [t('pdf_ref'), inv.id]].forEach(([k, v]) => {
+        doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(...MUTE);
+        doc.text(k, M + 5, ty);
+        doc.setFont('helvetica','bold'); doc.setTextColor(...INK);
+        doc.text(String(v), M + 32, ty);
         ty += 5;
       });
-      const qr = sepaQrDataUrl(iban, sender, inv.total, inv.id);
-      if (qr) {
-        const q = 32;
-        doc.addImage(qr, 'PNG', W-M-q-4, y+5, q, q);
-        doc.setFontSize(6); doc.setFont('helvetica','normal'); doc.setTextColor(140,140,140);
-        doc.text(doc.splitTextToSize(t('pay_scan'), 60), W-M-q-8, y+boxH-6, {align:'right'});
+      if ((inv.currency || S.settings.currency || 'EUR') === 'EUR') {
+        const qr = sepaQrDataUrl(iban, sender, inv.total, inv.id);
+        if (qr) {
+          const q = 32;
+          doc.addImage(qr, 'PNG', R - q - 4, y + 5, q, q);
+          doc.setFont('helvetica','normal'); doc.setFontSize(6.5); doc.setTextColor(...MUTE);
+          doc.text(doc.splitTextToSize(t('pay_scan'), 50), R - q - 8, y + boxH - 6, { align: 'right' });
+        }
       }
     }
     if (payLink) {
-      doc.setFontSize(9); doc.setFont('helvetica','bold'); doc.setTextColor(...(theme.key === 'white' ? [20,20,20] : accent));
-      doc.textWithLink(t('pdf_paylink'), M+5, iban ? ty + 1 : ty, { url: payLink });
+      doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(...accentText);
+      doc.textWithLink(t('pdf_paylink'), M + 5, iban ? ty + 1 : ty, { url: payLink });
     }
-    y += boxH + 6;
   }
 
+  // Footer on every page: small DuFattur mark and page numbers
   const pages = doc.getNumberOfPages();
   doc.setFontSize(6.5);
-  const madeW = doc.getStringUnitWidth(t('made_with') + ' ') * 6.5 / doc.internal.scaleFactor;
+  const made = t('made_with') + ' ';
+  doc.setFont('helvetica','normal');
+  const madeW = doc.getTextWidth(made);
   doc.setFont('helvetica','bold');
-  const duW = doc.getStringUnitWidth('DU') * 6.5 / doc.internal.scaleFactor;
-  const markW = madeW + duW + doc.getStringUnitWidth('FATTUR') * 6.5 / doc.internal.scaleFactor;
+  const duW = doc.getTextWidth('DU'), markW = madeW + duW + doc.getTextWidth('FATTUR');
   const mx = (W - markW) / 2, my = H - 8;
   for (let p = 1; p <= pages; p++) {
     doc.setPage(p);
-    doc.setFont('helvetica','normal'); doc.setTextColor(170,170,170);
-    doc.text(t('made_with') + ' ', mx, my);
+    doc.setFont('helvetica','normal'); doc.setFontSize(6.5); doc.setTextColor(170,170,170);
+    doc.text(made, mx, my);
     doc.setFont('helvetica','bold'); doc.setTextColor(120,120,120);
     doc.text('DU', mx + madeW, my);
     doc.setTextColor(...(theme.key === 'white' ? [120,120,120] : accent));
     doc.text('FATTUR', mx + madeW + duW, my);
     doc.link(mx, my - 3, markW, 4, { url: 'https://dufattur.nl' });
+    if (pages > 1) {
+      doc.setFont('helvetica','normal'); doc.setTextColor(170,170,170);
+      doc.text(`${p} / ${pages}`, R, my, { align: 'right' });
+    }
   }
-
-  doc.save(`${inv.id}.pdf`);
-  toast('📄', t('t_pdf'));
+  return doc;
 }
 
 // ── UBL 2.1 EXPORT ────────────────────────────────────────────────────
 function exportUBL(id) {
   const inv = S.invoices.find(i => i.id === id);
   if (!inv) return;
-  const cur = S.settings.currency || 'EUR';
+  const cur = inv.currency || S.settings.currency || 'EUR';
   const code = S.settings.country || 'IT';
   const ctry = COUNTRIES[code] || COUNTRIES.IT;
   const vatCode = S.settings.kleinunternehmer ? 'E' : (parseFloat(inv.vatRate||0) === 0 ? 'Z' : 'S');
@@ -2761,7 +2964,7 @@ function exportUBL(id) {
     const lineAmt = (parseFloat(it.hours||0) * parseFloat(it.rate||0)).toFixed(2);
     return `  <cac:InvoiceLine>
     <cbc:ID>${i+1}</cbc:ID>
-    <cbc:InvoicedQuantity unitCode="HUR">${parseFloat(it.hours||0).toFixed(2)}</cbc:InvoicedQuantity>
+    <cbc:InvoicedQuantity unitCode="${it.discount ? 'C62' : 'HUR'}">${it.discount ? '-1.00' : parseFloat(it.hours||0).toFixed(2)}</cbc:InvoicedQuantity>
     <cbc:LineExtensionAmount currencyID="${cur}">${lineAmt}</cbc:LineExtensionAmount>
     <cac:Item>
       <cbc:Description>${esc(it.desc||'')}</cbc:Description>
@@ -2773,7 +2976,7 @@ function exportUBL(id) {
       </cac:ClassifiedTaxCategory>
     </cac:Item>
     <cac:Price>
-      <cbc:PriceAmount currencyID="${cur}">${parseFloat(it.rate||0).toFixed(2)}</cbc:PriceAmount>
+      <cbc:PriceAmount currencyID="${cur}">${Math.abs(parseFloat(it.rate||0)).toFixed(2)}</cbc:PriceAmount>
     </cac:Price>
   </cac:InvoiceLine>`;
   }).join('\n');
@@ -2926,7 +3129,8 @@ function duplicateInv(id) {
     // Rebuild line items
     document.getElementById('items-box').innerHTML = '';
     itemIdx = 0;
-    (inv.items || []).forEach(it => addItem(it.desc, it.hours, it.rate));
+    (inv.items || []).forEach(it => it.discount ? addDiscount(it.desc, Math.abs(it.amount)) : addItem(it.desc, it.hours, it.rate));
+    if (inv.docLang) document.getElementById('in-lang').value = inv.docLang;
     if (!inv.items || !inv.items.length) addItem();
     document.getElementById('in-notes').value = inv.notes || S.settings.terms || '';
     recalc();
@@ -2940,16 +3144,17 @@ function remindInvoice(id) {
   if (!inv) return;
 
   const sender = S.settings.name || S.settings.email || 'DuFattur';
-  const amount = fmt(inv.total);
-  const due    = inv.dueDate ? fmtDate(inv.dueDate) : '';
-  const link   = inv.id ? `${location.origin}${location.pathname}?inv=${inv.id}` : '';
+  const amount = withInvoiceContext(inv, () => fmt(inv.total));
+  const due    = inv.dueDate ? withInvoiceContext(inv, () => fmtDate(inv.dueDate)) : '';
+  const link   = clientLink(inv);
+  const itDoc  = (inv.sellerCountry || S.settings.country) === 'IT' ? 'proforma' : 'fattura';
   const iban   = S.settings.iban || '';
   const client = inv.client || '';
 
   const templates = {
     it: {
       subj: `Sollecito di pagamento ${inv.id}`,
-      body: `Gentile ${client},\n\nTi scrivo per ricordarti che la proforma n. ${inv.id} di ${amount}${due ? ` (scaduta il ${due})` : ''} risulta ancora non saldata.\n\nPuoi consultarla qui:\n${link}${iban ? `\n\nCoordinate bancarie: IBAN ${iban}` : ''}\n\nGrazie per la collaborazione,\n${sender}`,
+      body: `Gentile ${client},\n\nTi scrivo per ricordarti che la ${itDoc} n. ${inv.id} di ${amount}${due ? ` (scaduta il ${due})` : ''} risulta ancora non saldata.\n\nPuoi consultarla qui:\n${link}${iban ? `\n\nCoordinate bancarie: IBAN ${iban}` : ''}\n\nGrazie per la collaborazione,\n${sender}`,
     },
     en: {
       subj: `Payment reminder ${inv.id}`,
@@ -2965,7 +3170,7 @@ function remindInvoice(id) {
     },
   };
 
-  const tpl = templates[S.lang] || templates.en;
+  const tpl = templates[inv.docLang || S.lang] || templates.en;
   _emailInvId = id;
   _emailBody  = tpl.body;
   _emailSubj  = tpl.subj;
@@ -3063,16 +3268,17 @@ function emailInvoice(id) {
   if (!inv) return;
 
   const sender  = S.settings.name || S.settings.email || 'DuFattur';
-  const amount  = fmt(inv.total);
-  const due     = inv.dueDate ? fmtDate(inv.dueDate) : '';
-  const link    = inv.id ? `${location.origin}${location.pathname}?inv=${inv.id}` : '';
+  const amount  = withInvoiceContext(inv, () => fmt(inv.total));
+  const due     = inv.dueDate ? withInvoiceContext(inv, () => fmtDate(inv.dueDate)) : '';
+  const link    = clientLink(inv);
+  const itDoc   = (inv.sellerCountry || S.settings.country) === 'IT' ? 'proforma' : 'fattura';
   const iban    = S.settings.iban || '';
   const client  = inv.client || '';
 
   const templates = {
     it: {
-      subj: `Proforma ${inv.id}: ${amount}`,
-      body: `Gentile ${client},\n\nTi invio la proforma n. ${inv.id} per la tua revisione e approvazione.\n\nImporto: ${amount}${due ? `\nScadenza: ${due}` : ''}\n\nPuoi visualizzare e approvare online qui:\n${link}${iban ? `\n\nCoordinate bancarie: IBAN ${iban}` : ''}\n\nGrazie,\n${sender}`,
+      subj: `${itDoc[0].toUpperCase() + itDoc.slice(1)} ${inv.id}: ${amount}`,
+      body: `Gentile ${client},\n\nTi invio la ${itDoc} n. ${inv.id} per la tua revisione e approvazione.\n\nImporto: ${amount}${due ? `\nScadenza: ${due}` : ''}\n\nPuoi visualizzare e approvare online qui:\n${link}${iban ? `\n\nCoordinate bancarie: IBAN ${iban}` : ''}\n\nGrazie,\n${sender}`,
     },
     en: {
       subj: `Invoice ${inv.id}: ${amount} due`,
@@ -3088,7 +3294,7 @@ function emailInvoice(id) {
     },
   };
 
-  const tpl = templates[S.lang] || templates.en;
+  const tpl = templates[inv.docLang || S.lang] || templates.en;
   _emailInvId = id;
   _emailBody  = tpl.body;
   _emailSubj  = tpl.subj;
