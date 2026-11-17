@@ -228,6 +228,10 @@
 
 <!-- ═══════════════════ MAIN ═══════════════════ -->
 <main class="flex-1 overflow-y-auto" id="main-content">
+    <div id="guest-bar" class="hidden sticky top-0 z-40 flex items-center justify-center gap-3 flex-wrap px-4 py-2.5 text-xs font-bold" style="background:rgba(var(--accent-rgb),.14);border-bottom:1px solid rgba(var(--accent-rgb),.35);">
+        <span class="text-gray-200" data-i18n="guest_bar">Trial mode: everything stays on this device.</span>
+        <button type="button" onclick="leaveGuestToSignup()" class="text-accent underline" data-i18n="guest_cta">Create a free account →</button>
+    </div>
 
     <!-- Toast -->
     <div id="toast" class="hidden fixed top-5 right-5 bg-surface border border-gray-700 text-white px-5 py-4 rounded-2xl shadow-2xl font-bold z-50 flex items-center gap-3" style="max-width:320px;background:#1a1a1a;">
@@ -299,7 +303,7 @@
                         <div class="font-bold text-sm text-white mb-2">Run this SQL in the SQL Editor</div>
                         <div class="relative">
                             <pre id="schema-pre" class="sql-block">create table if not exists public.invoices (
-  id               text          primary key,
+  id               text          not null,
   public_token     uuid          not null default gen_random_uuid(),
   user_id          uuid          not null references auth.users(id) on delete cascade,
   client           text          not null,
@@ -319,13 +323,16 @@
   freelancer_name  text,
   pay_link         text,
   meta             jsonb,
-  created_at       timestamptz   not null default now()
+  created_at       timestamptz   not null default now(),
+  primary key (user_id, id)
 );
 -- if upgrading an existing table, run:
 -- alter table public.invoices add column if not exists freelancer_iban text;
 -- alter table public.invoices add column if not exists freelancer_name text;
 -- alter table public.invoices add column if not exists pay_link text;
 -- alter table public.invoices add column if not exists meta jsonb;
+-- alter table public.invoices drop constraint if exists invoices_pkey;
+-- alter table public.invoices add primary key (user_id, id);
 
 create table if not exists public.settings (
   user_id          uuid          primary key references auth.users(id) on delete cascade,
@@ -457,12 +464,16 @@ grant execute on function public.keepalive() to anon;</pre>
                     <button id="btn-login" onclick="doLogin()" class="btn-y w-full">SEND MAGIC LINK</button>
                     <div class="text-center text-gray-700 text-[10px] mt-3 font-medium">No password. No subscription. Free.</div>
                     <div id="login-err" class="hidden mt-3 text-red-400 text-xs text-center font-bold"></div>
+                    <div class="flex items-center gap-3 my-5 text-[10px] text-gray-700 font-bold uppercase tracking-widest"><span class="flex-1 h-px bg-gray-800"></span>or<span class="flex-1 h-px bg-gray-800"></span></div>
+                    <button id="btn-try" onclick="startGuest()" class="btn-o w-full">TRY IT WITHOUT AN ACCOUNT</button>
+                    <div class="text-center text-gray-600 text-[11px] mt-2">Nothing leaves this device until you sign up.</div>
                 </div>
                 <div id="login-sent" class="hidden text-center py-4">
                     <div class="text-4xl mb-4">📬</div>
                     <div class="font-black text-white mb-2">Check your email!</div>
                     <div class="text-gray-500 text-sm">We sent a magic link to <span id="sent-email" class="text-accent font-bold"></span></div>
                 </div>
+                <div class="text-center text-[11px] text-gray-600 mt-5">🇪🇺 Stored in the EU · Export your data any time · <a href="privacy.html" class="underline hover:text-gray-400">Privacy</a></div>
             </div>
 
         </div>
@@ -719,6 +730,10 @@ grant execute on function public.keepalive() to anon;</pre>
                 <h3 class="text-2xl font-black mb-2" data-i18n="succ_h">Link Pronto!</h3>
                 <p class="text-gray-500 text-sm mb-6" data-i18n="succ_p">Invia questo link al cliente per l'approvazione.</p>
 
+                <div id="guest-succ" class="hidden w-full rounded-xl border border-gray-800 px-5 py-4 text-left mb-6 text-sm text-gray-400">
+                    <div data-i18n="succ_guest" class="mb-3">With a free account your client gets a link with a pay button and QR code.</div>
+                    <button type="button" onclick="leaveGuestToSignup()" class="btn-y text-xs py-2 px-4" data-i18n="guest_cta">Create a free account →</button>
+                </div>
                 <div id="gen-link" onclick="copyClientLink()" class="w-full bg-black border border-gray-800 rounded-xl px-5 py-4 font-mono text-sm text-accent text-left mb-6 cursor-pointer hover:border-accent transition">
                     <div class="text-[10px] text-gray-600 mb-1" data-i18n="lnk_lbl">Link Cliente</div>
                     <span id="gen-link-txt">loading...</span> <span class="text-gray-600">↗</span>
@@ -1098,6 +1113,13 @@ grant execute on function public.keepalive() to anon;</pre>
                 </div>
             </div>
 
+            <!-- Your data -->
+            <div class="card" style="background:#0e0e0e;border-color:#1e1e1e;">
+                <h3 class="text-[10px] font-black uppercase tracking-widest text-gray-500 mb-2" data-i18n="set_data">Your data</h3>
+                <p class="text-xs text-gray-500 mb-3"><span data-i18n="set_data_p">Download everything in one file.</span> <a href="privacy.html" target="_blank" class="underline" data-i18n="privacy_link">Privacy</a></p>
+                <button type="button" onclick="exportAllData()" class="btn-o text-xs py-2 px-4" data-i18n="btn_export">Export all my data</button>
+            </div>
+
             <!-- Install as an app -->
             <div class="card" style="background:#0e0e0e;border-color:#1e1e1e;">
                 <h3 class="text-[10px] font-black uppercase tracking-widest text-gray-500 mb-2" data-i18n="set_install">Install the app</h3>
@@ -1144,6 +1166,7 @@ const L = {
     vies_btn:'Verifica', vies_busy:'Verifica in VIES…', vies_ok:'Valida in VIES', vies_bad:'Non valida in VIES: controlla il numero con il cliente.', vies_down:'VIES non risponde ora: riprova più tardi.', vies_setup:'La verifica VIES non è ancora attiva (funzione da pubblicare in Supabase).', vies_fmt:'Non sembra una partita IVA UE.',
     ubl_gap_seller:'E-fattura scaricata. Per Peppol manca il tuo identificativo (KVK o partita IVA nelle impostazioni).', ubl_gap_buyer:'E-fattura scaricata. Per Peppol serve la partita IVA del cliente.', lbl_cref:'Riferimento del cliente / n. ordine (facoltativo)', set_phone:'Telefono',
     set_install:'Installa l\'app', btn_install:'Installa DuFattur', install_ios:'Su iPhone: tocca Condividi, poi «Aggiungi alla schermata Home».', install_other:'Aggiungi DuFattur alla schermata Home: si apre a schermo intero, come un\'app.', install_done:'DuFattur è installata su questo dispositivo.',
+    guest_bar:'Modalità prova: tutto resta su questo dispositivo.', guest_cta:'Crea un account gratuito →', succ_guest:'Con un account gratuito il cliente riceve un link con pulsante di pagamento e QR. Il PDF funziona già.', c_import:'Hai {n} fatture dalla prova su questo dispositivo. Spostarle nel tuo account?', t_imported:'Dati della prova spostati nel tuo account.', vies_guest:'Crea un account gratuito per verificare le partite IVA in VIES.', exp_guest:'Le spese richiedono un account gratuito: le ricevute vengono salvate in modo sicuro.', set_data:'I tuoi dati', set_data_p:'Scarica tutto in un file (JSON). I dati sono conservati nell\'UE (Stoccolma).', btn_export:'Esporta tutti i miei dati', t_export:'Dati esportati.', privacy_link:'Privacy',
     nav_dash:'Dashboard', nav_inv:'Nuovo Proforma', nav_an:'Analisi', nav_set:'Impostazioni',
     dash_h1:'Dashboard Operativa', dash_sub:'Monitora ore, incassi e stato dei proforma.',
     kpi_tot:'Totale Proforma', kpi_pend:'In Attesa', kpi_appr:'Da Incassare', kpi_tax:'Fondo Tasse',
@@ -1221,6 +1244,7 @@ const L = {
     vies_btn:'Check', vies_busy:'Checking VIES…', vies_ok:'Valid in VIES', vies_bad:'Not valid in VIES: check the number with your client.', vies_down:'VIES isn\'t responding right now: try again later.', vies_setup:'The VIES check isn\'t set up yet (function to deploy in Supabase).', vies_fmt:'This doesn\'t look like an EU VAT number.',
     ubl_gap_seller:'E-invoice downloaded. For Peppol, add your KVK or VAT number in Settings.', ubl_gap_buyer:'E-invoice downloaded. For Peppol, your client\'s VAT number is needed.', lbl_cref:'Client\'s reference / PO number (optional)', set_phone:'Phone',
     set_install:'Install the app', btn_install:'Install DuFattur', install_ios:'On iPhone: tap Share, then "Add to Home Screen".', install_other:'Add DuFattur to your home screen: it opens full-screen, like an app.', install_done:'DuFattur is installed on this device.',
+    guest_bar:'Trial mode: everything stays on this device.', guest_cta:'Create a free account →', succ_guest:'With a free account your client gets a link with a pay button and QR code. The PDF already works.', c_import:'You have {n} invoices from the trial on this device. Move them into your account?', t_imported:'Trial data moved into your account.', vies_guest:'Create a free account to check VAT numbers in VIES.', exp_guest:'Expenses need a free account so receipts are stored safely.', set_data:'Your data', set_data_p:'Download everything in one file (JSON). Your data is stored in the EU (Stockholm).', btn_export:'Export all my data', t_export:'Data exported.', privacy_link:'Privacy',
     nav_dash:'Dashboard', nav_inv:'New Invoice', nav_an:'Analytics', nav_set:'Settings',
     dash_h1:'Operations Dashboard', dash_sub:'Track hours, revenue, and invoice status.',
     kpi_tot:'Total Invoices', kpi_pend:'Pending', kpi_appr:'Outstanding', kpi_tax:'Tax Vault',
@@ -1298,6 +1322,7 @@ const L = {
     vies_btn:'Controleer', vies_busy:'VIES controleren…', vies_ok:'Geldig in VIES', vies_bad:'Niet geldig in VIES: controleer het nummer met je klant.', vies_down:'VIES reageert nu niet: probeer het later opnieuw.', vies_setup:'De VIES-controle is nog niet actief (functie publiceren in Supabase).', vies_fmt:'Dit lijkt geen EU-btw-nummer.',
     ubl_gap_seller:'E-factuur gedownload. Voor Peppol: vul je KVK- of btw-nummer in bij Instellingen.', ubl_gap_buyer:'E-factuur gedownload. Voor Peppol is het btw-nummer van je klant nodig.', lbl_cref:'Referentie van de klant / ordernummer (optioneel)', set_phone:'Telefoon',
     set_install:'App installeren', btn_install:'DuFattur installeren', install_ios:'Op iPhone: tik op Deel en dan op "Zet op beginscherm".', install_other:'Zet DuFattur op je beginscherm: het opent schermvullend, als een app.', install_done:'DuFattur is geïnstalleerd op dit apparaat.',
+    guest_bar:'Proefmodus: alles blijft op dit apparaat.', guest_cta:'Maak een gratis account →', succ_guest:'Met een gratis account krijgt je klant een link met betaalknop en QR-code. De pdf werkt nu al.', c_import:'Je hebt {n} facturen uit de proef op dit apparaat. Naar je account verplaatsen?', t_imported:'Proefgegevens naar je account verplaatst.', vies_guest:'Maak een gratis account om btw-nummers in VIES te controleren.', exp_guest:'Kosten vragen een gratis account, zodat bonnetjes veilig bewaard worden.', set_data:'Je gegevens', set_data_p:'Download alles in één bestand (JSON). Je gegevens staan in de EU (Stockholm).', btn_export:'Al mijn gegevens exporteren', t_export:'Gegevens geëxporteerd.', privacy_link:'Privacy',
     nav_dash:'Dashboard', nav_inv:'Nieuwe Factuur', nav_an:'Analyse', nav_set:'Instellingen',
     dash_h1:'Operationeel Dashboard', dash_sub:'Volg uren, omzet en factuurstatus.',
     kpi_tot:'Totaal Facturen', kpi_pend:'In Behandeling', kpi_appr:'Openstaand', kpi_tax:'Belastingreserve',
@@ -1375,6 +1400,7 @@ const L = {
     vies_btn:'Prüfen', vies_busy:'VIES wird geprüft…', vies_ok:'Gültig in VIES', vies_bad:'Nicht gültig in VIES: Nummer mit dem Kunden prüfen.', vies_down:'VIES antwortet gerade nicht: später erneut versuchen.', vies_setup:'Die VIES-Prüfung ist noch nicht aktiv (Funktion in Supabase veröffentlichen).', vies_fmt:'Das sieht nicht wie eine EU-USt-IdNr. aus.',
     ubl_gap_seller:'E-Rechnung heruntergeladen. Für Peppol: KVK- oder USt-IdNr. in den Einstellungen eintragen.', ubl_gap_buyer:'E-Rechnung heruntergeladen. Für Peppol wird die USt-IdNr. des Kunden benötigt.', lbl_cref:'Referenz des Kunden / Bestellnummer (optional)', set_phone:'Telefon',
     set_install:'App installieren', btn_install:'DuFattur installieren', install_ios:'Auf dem iPhone: Teilen tippen, dann „Zum Home-Bildschirm“.', install_other:'DuFattur zum Home-Bildschirm hinzufügen: öffnet sich im Vollbild, wie eine App.', install_done:'DuFattur ist auf diesem Gerät installiert.',
+    guest_bar:'Testmodus: alles bleibt auf diesem Gerät.', guest_cta:'Kostenloses Konto erstellen →', succ_guest:'Mit einem kostenlosen Konto bekommt dein Kunde einen Link mit Bezahl-Button und QR-Code. Das PDF funktioniert schon.', c_import:'Du hast {n} Rechnungen aus dem Test auf diesem Gerät. In dein Konto übernehmen?', t_imported:'Testdaten in dein Konto übernommen.', vies_guest:'Erstelle ein kostenloses Konto, um USt-IdNr. in VIES zu prüfen.', exp_guest:'Ausgaben brauchen ein kostenloses Konto, damit Belege sicher gespeichert werden.', set_data:'Deine Daten', set_data_p:'Alles in einer Datei herunterladen (JSON). Deine Daten liegen in der EU (Stockholm).', btn_export:'Alle meine Daten exportieren', t_export:'Daten exportiert.', privacy_link:'Datenschutz',
     nav_dash:'Dashboard', nav_inv:'Neue Rechnung', nav_an:'Analyse', nav_set:'Einstellungen',
     dash_h1:'Betriebsdashboard', dash_sub:'Stunden, Umsatz und Rechnungsstatus verfolgen.',
     kpi_tot:'Rechnungen Gesamt', kpi_pend:'Ausstehend', kpi_appr:'Offene Posten', kpi_tax:'Steuerrücklage',
@@ -1674,6 +1700,7 @@ async function viesCheck(auto) {
   if (!vat) return;
   if (_vies && _vies.vat === vat) return;
   if (!VIES_CC.includes(vat.slice(0, 2)) || vat.length < 4) { if (!auto) setViesStatus(t('vies_fmt'), 'warn'); return; }
+  if (S.guest) { setViesStatus(t('vies_guest'), 'warn'); return; }
   setViesStatus(t('vies_busy'), 'busy');
   const btn = document.getElementById('btn-vies');
   btn.disabled = true;
@@ -1824,7 +1851,8 @@ function applyTr() {
 
 function setLang(l) {
   S.lang = l;
-  if (_sb && USER) {
+  if (S.guest) guestSave();
+  else if (_sb && USER) {
     _sb.from('settings').upsert({ lang: l, user_id: USER.id, updated_at: new Date().toISOString() })
       .then(() => {});
   }
@@ -2099,6 +2127,7 @@ async function doLogin() {
 }
 
 async function doLogout() {
+  if (S.guest) { leaveGuestToSignup(); return; }
   showView('loading', { msg: 'Signing out...' });
   await _sb.auth.signOut();
   USER = null;
@@ -2145,6 +2174,10 @@ async function boot() {
   }
 
   // No session - listen in case onAuthStateChange fires (PKCE code exchange)
+  let guestActive = false;
+  try { guestActive = localStorage.getItem(GUEST_ACTIVE) === '1'; } catch (_) {}
+  if (guestActive) { startGuest(); return; }
+
   _sb.auth.onAuthStateChange(async (event, session) => {
     if (event === 'SIGNED_IN' && session) {
       USER = session.user;
@@ -2205,11 +2238,132 @@ async function loadApp() {
     applyTr();
     showView('dashboard');
     restoreTimerState();
+    maybeImportGuest();
   } catch (err) {
     console.error('loadApp error:', err);
     toast('❌', err.message || 'Failed to load data');
     showView('dashboard');
   }
+}
+
+function settingsRow() {
+  return {
+    user_id:          USER.id,
+    country:          S.settings.country,
+    name:             S.settings.name,
+    email:            S.settings.email,
+    vat:              S.settings.vat,
+    vat2:             S.settings.vat2,
+    address:          S.settings.address,
+    iban:             S.settings.iban,
+    default_rate:     S.settings.defaultRate,
+    tax_rate:         S.settings.taxRate,
+    currency:         S.settings.currency,
+    vat_on_invoice:   S.settings.vatOnInvoice,
+    vat_enabled:      S.settings.vatEnabled,
+    ritenuta:         S.settings.ritenuta,
+    kleinunternehmer: S.settings.kleinunternehmer,
+    autoentrepreneur: S.settings.autoentrepreneur,
+    terms:            S.settings.terms,
+    due_days:         S.settings.dueDays,
+    lang:             S.lang,
+    logo:             S.settings.logo || null,
+    options:          S.settings.options || {},
+    updated_at:       new Date().toISOString()
+  };
+}
+
+// ── TRIAL MODE (no account; data stays in this browser) ───────────────
+const GUEST_KEY = 'df_guest_v1';
+const GUEST_ACTIVE = 'df_guest_active';
+const DEFAULT_SETTINGS = () => ({ name:'', email:'', vat:'', vat2:'', address:'', defaultRate:50, taxRate:15, currency:'EUR', terms:'', dueDays:30,
+  country:'IT', iban:'', vatOnInvoice:22, vatEnabled:true, ritenuta:false, kleinunternehmer:false, autoentrepreneur:false, logo:'', options:{} });
+
+function guestState() {
+  try { return JSON.parse(localStorage.getItem(GUEST_KEY) || 'null'); } catch { return null; }
+}
+
+function guestSave() {
+  try { localStorage.setItem(GUEST_KEY, JSON.stringify({ settings: S.settings, lang: S.lang, invoices: S.invoices })); }
+  catch { toast('⚠️', 'Storage full'); }
+}
+
+function startGuest() {
+  S.guest = true;
+  USER = { id: 'guest' };
+  try { localStorage.setItem(GUEST_ACTIVE, '1'); } catch (_) {}
+  const st = guestState();
+  if (st) {
+    S.settings = { ...DEFAULT_SETTINGS(), ...(st.settings || {}) };
+    S.invoices = Array.isArray(st.invoices) ? st.invoices : [];
+    if (st.lang && L[st.lang]) S.lang = st.lang;
+  } else {
+    // First visit: guess language and country from the browser so the first invoice is already right
+    const loc = navigator.language || 'en';
+    const lang = loc.slice(0, 2).toLowerCase(), region = (loc.split('-')[1] || '').toUpperCase();
+    if (L[lang]) S.lang = lang;
+    S.settings = DEFAULT_SETTINGS();
+    if (COUNTRIES[region]) {
+      S.settings.country = region;
+      S.settings.currency = COUNTRIES[region].currency;
+      S.settings.vatOnInvoice = taxOf(region).rates[0];
+    }
+    S.invoices = [];
+    guestSave();
+  }
+  S.expenses = []; S.expensesReady = false;
+  applyTr();
+  document.getElementById('guest-bar').classList.remove('hidden');
+  showView('dashboard');
+  restoreTimerState();
+}
+
+function leaveGuestToSignup() {
+  S.guest = false;
+  USER = null;
+  try { localStorage.removeItem(GUEST_ACTIVE); } catch (_) {}
+  document.getElementById('guest-bar').classList.add('hidden');
+  showView('login');
+  setTimeout(() => document.getElementById('login-email')?.focus(), 50);
+}
+
+// After signing in, offer to move trial invoices and settings into the account
+async function maybeImportGuest() {
+  const st = guestState();
+  if (!st || (!(st.invoices || []).length && !(st.settings || {}).name)) return;
+  try { if (sessionStorage.getItem('df_import_asked')) return; sessionStorage.setItem('df_import_asked', '1'); } catch (_) {}
+  if (!confirm(t('c_import').replace('{n}', (st.invoices || []).length))) return;
+  try {
+    if (!S.settings.name && st.settings) {
+      S.settings = { ...S.settings, ...st.settings };
+      const { error } = await _sb.from('settings').upsert(settingsRow());
+      if (error) throw error;
+    }
+    const trial = [...(st.invoices || [])].sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)));
+    for (const inv of trial) {
+      const row = invToDb({ ...inv, id: newId() });
+      const { data, error } = await _sb.from('invoices').insert([row]).select().single();
+      if (error) throw error;
+      S.invoices.unshift(dbToInv(data));
+    }
+    localStorage.removeItem(GUEST_KEY);
+    renderDash();
+    toast('✅', t('t_imported'));
+  } catch (err) {
+    toast('❌', err.message || 'Import failed');
+  }
+}
+
+function exportAllData() {
+  const data = { app: 'DuFattur', exportedAt: new Date().toISOString(), settings: S.settings, invoices: S.invoices,
+    expenses: (S.expenses || []).map(x => ({ ...x, receipt: x.receiptType ? '(stored in your account; open it in DuFattur)' : null })) };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `dufattur-export-${new Date().toISOString().slice(0, 10)}.json`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  toast('📦', t('t_export'));
 }
 
 // ── DB MAPPING ────────────────────────────────────────────────────────
@@ -2542,7 +2696,9 @@ async function generateInvoice(e) {
 
   try {
     const row = invToDb(inv);
-    let { data, error } = await _sb.from('invoices').insert([row]).select().single();
+    let data = null, error = null;
+    if (S.guest) data = { ...row, public_token: null };
+    else ({ data, error } = await _sb.from('invoices').insert([row]).select().single());
     // Older databases lack the newer columns; save without them rather than fail.
     if (error && /freelancer_|pay_link|meta/.test(error.message || '')) {
       delete row.freelancer_iban;
@@ -2556,6 +2712,9 @@ async function generateInvoice(e) {
     const saved = dbToInv(data);
     S.invoices.unshift(saved);
     window._lid = saved.id;
+    if (S.guest) guestSave();
+    document.getElementById('guest-succ').classList.toggle('hidden', !S.guest);
+    document.getElementById('gen-link').classList.toggle('hidden', !!S.guest);
 
     const clientUrl = window.location.origin + window.location.pathname + '?token=' + saved.publicToken;
     window._clientUrl = clientUrl;
@@ -2892,7 +3051,9 @@ function initExpenses() {
   sel.innerHTML = '';
   opts.forEach(([v, label]) => { const o = document.createElement('option'); o.value = v; o.textContent = label; sel.appendChild(o); });
   if (!document.getElementById('ex-date').value) document.getElementById('ex-date').value = new Date().toISOString().slice(0, 10);
-  document.getElementById('ex-db-note').classList.toggle('hidden', S.expensesReady);
+  const note = document.getElementById('ex-db-note');
+  note.classList.toggle('hidden', S.expensesReady);
+  note.textContent = S.guest ? t('exp_guest') : t('exp_db');
   document.getElementById('ex-save').disabled = !S.expensesReady;
   expensePreview();
   renderExpenses();
@@ -3142,10 +3303,13 @@ function downloadTaxCalendar() {
 
 async function markPaid(id) {
   try {
-    const { error } = await _sb.from('invoices').update({ status: 'paid' }).eq('id', id).eq('user_id', USER.id);
-    if (error) throw error;
+    if (!S.guest) {
+      const { error } = await _sb.from('invoices').update({ status: 'paid' }).eq('id', id).eq('user_id', USER.id);
+      if (error) throw error;
+    }
     const inv = S.invoices.find(i => i.id === id);
     if (inv) inv.status = 'paid';
+    if (S.guest) guestSave();
     renderDash();
     toast('💜', t('t_paid'));
   } catch (err) {
@@ -3156,9 +3320,12 @@ async function markPaid(id) {
 async function delInv(id) {
   if (!confirm(t('c_del'))) return;
   try {
-    const { error } = await _sb.from('invoices').delete().eq('id', id).eq('user_id', USER.id);
-    if (error) throw error;
+    if (!S.guest) {
+      const { error } = await _sb.from('invoices').delete().eq('id', id).eq('user_id', USER.id);
+      if (error) throw error;
+    }
     S.invoices = S.invoices.filter(i => i.id !== id);
+    if (S.guest) guestSave();
     renderDash();
     toast('🗑️', t('t_del'));
   } catch (err) {
@@ -3306,30 +3473,8 @@ async function saveSettings() {
   };
 
   try {
-    const row = {
-      user_id:          USER.id,
-      country:          S.settings.country,
-      name:             S.settings.name,
-      email:            S.settings.email,
-      vat:              S.settings.vat,
-      vat2:             S.settings.vat2,
-      address:          S.settings.address,
-      iban:             S.settings.iban,
-      default_rate:     S.settings.defaultRate,
-      tax_rate:         S.settings.taxRate,
-      currency:         S.settings.currency,
-      vat_on_invoice:   S.settings.vatOnInvoice,
-      vat_enabled:      S.settings.vatEnabled,
-      ritenuta:         S.settings.ritenuta,
-      kleinunternehmer: S.settings.kleinunternehmer,
-      autoentrepreneur: S.settings.autoentrepreneur,
-      terms:            S.settings.terms,
-      due_days:         S.settings.dueDays,
-      lang:             S.lang,
-      logo:             S.settings.logo || null,
-      options:          S.settings.options || {},
-      updated_at:       new Date().toISOString()
-    };
+    if (S.guest) { guestSave(); toast('✅', t('t_saved')); return; }
+    const row = settingsRow();
     let { error } = await _sb.from('settings').upsert(row);
     // Databases without the logo column: save everything else and say why the logo didn't stick.
     if (error && /logo|options/.test(error.message || '')) {
@@ -3351,9 +3496,12 @@ async function saveSettings() {
 async function clearData() {
   if (!confirm(t('c_clear'))) return;
   try {
-    const { error } = await _sb.from('invoices').delete().eq('user_id', USER.id);
-    if (error) throw error;
+    if (!S.guest) {
+      const { error } = await _sb.from('invoices').delete().eq('user_id', USER.id);
+      if (error) throw error;
+    }
     S.invoices = [];
+    if (S.guest) guestSave();
     renderDash();
     toast('🗑️', t('t_cleared'));
     showView('dashboard');
@@ -3928,7 +4076,8 @@ function remindInvoice(id) {
     },
   };
 
-  const tpl = templates[inv.docLang || S.lang] || templates.en;
+  const tpl = { ...(templates[inv.docLang || S.lang] || templates.en) };
+  if (!link) tpl.body = tpl.body.replace(/\n\n[^\n]*:\n(?=\n)/, '');
   _emailInvId = id;
   _emailBody  = tpl.body;
   _emailSubj  = tpl.subj;
@@ -4063,7 +4212,8 @@ function emailInvoice(id) {
     },
   };
 
-  const tpl = templates[inv.docLang || S.lang] || templates.en;
+  const tpl = { ...(templates[inv.docLang || S.lang] || templates.en) };
+  if (!link) tpl.body = tpl.body.replace(/\n\n[^\n]*:\n(?=\n)/, '');
   _emailInvId = id;
   _emailBody  = tpl.body;
   _emailSubj  = tpl.subj;

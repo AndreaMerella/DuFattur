@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Privacy | DuFattur</title>
+<meta name="theme-color" content="#0a0a0a">
+<link rel="icon" href="icons/icon-192.png">
+<style>
+  body { margin: 0; background: #0a0a0a; color: #d4d4d4; font: 15px/1.65 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 680px; margin: 0 auto; padding: 48px 20px 80px; }
+  h1 { color: #fff; font-size: 28px; margin: 0 0 4px; }
+  h2 { color: #fff; font-size: 17px; margin: 32px 0 8px; }
+  a { color: #60a5fa; }
+  .muted { color: #8a8a8a; font-size: 13px; }
+  .brand { font-weight: 900; letter-spacing: -0.02em; color: #fff; text-decoration: none; font-size: 18px; }
+  .brand span { color: #3b82f6; }
+  ul { padding-left: 20px; }
+  .box { background: #111; border: 1px solid #1f1f1f; border-radius: 12px; padding: 14px 16px; }
+</style>
+</head>
+<body>
+<main>
+  <a class="brand" href="./">DU<span>FATTUR</span></a>
+  <h1 style="margin-top:24px">Privacy</h1>
+  <p class="muted">Last updated 17 November 2026</p>
+
+  <div class="box">In short: your data is stored in the EU, used only to run DuFattur for you, never sold, never used for ads,
+  and you can export or delete it. In trial mode nothing leaves your device.</div>
+
+  <h2>Who runs DuFattur</h2>
+  <p>DuFattur is run by Andrea Merella, sole trader in Amsterdam, the Netherlands (KVK 80653235).
+  Questions or requests: <a href="mailto:privacy@dufattur.nl">privacy@dufattur.nl</a>.</p>
+
+  <h2>What is stored</h2>
+  <ul>
+    <li><strong>Trial mode (no account):</strong> nothing on our servers. Your settings and invoices stay in this browser's local storage until you clear it or create an account.</li>
+    <li><strong>With an account:</strong> your email address (to sign you in), your business details (name, address, tax numbers, IBAN, logo), the invoices and client details you enter, and expenses and receipts if you use them.</li>
+  </ul>
+  <p>We process this to provide the service you asked for (GDPR article 6(1)(b)).</p>
+
+  <h2>Where it is stored</h2>
+  <p>In a Supabase database and login service hosted in the EU (Stockholm, Sweden). The website itself is served by GitHub Pages.</p>
+
+  <h2>Who can see it</h2>
+  <ul>
+    <li><strong>You.</strong></li>
+    <li><strong>Your client</strong> sees only the invoice whose secret link you send them.</li>
+    <li>For operation and support, the database administrator and the hosting provider can technically access stored data. We don't look at it unless you ask for help or the law requires it. Your data is encrypted in transit and at rest by the host, but it is not end-to-end encrypted.</li>
+  </ul>
+
+  <h2>Services your browser contacts</h2>
+  <ul>
+    <li>Supabase (EU): your account and data.</li>
+    <li>The European Commission's VIES service, only when you check a client's VAT number.</li>
+    <li>Your own email app, when you send an invoice by email.</li>
+    <li>jsDelivr, cdnjs, the Tailwind CDN and Google Fonts, which serve the page's code and fonts. Like any website, they can see your IP address.</li>
+  </ul>
+  <p>No advertising, no tracking cookies, no analytics, and your data is never sold.</p>
+
+  <h2>Your rights</h2>
+  <ul>
+    <li><strong>Export:</strong> Settings → Your data → Export all my data.</li>
+    <li><strong>Correct:</strong> edit anything in the app.</li>
+    <li><strong>Delete:</strong> delete invoices in the app, or email us to delete your whole account.</li>
+    <li>You can also complain to the Dutch data protection authority, the Autoriteit Persoonsgegevens.</li>
+  </ul>
+
+  <h2>How long</h2>
+  <p>Until you delete it or ask us to. Keep in mind that tax law usually requires you to keep your own invoices for several years, so export them before deleting.</p>
+
+  <p style="margin-top:40px"><a href="./">← Back to DuFattur</a></p>
+</main>
+</body>
+</html>
