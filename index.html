@@ -318,6 +318,7 @@ create table if not exists public.settings (
   due_days         integer       default 30,
   lang             text          default 'it',
   logo             text,
+  options          jsonb,
   updated_at       timestamptz   default now()
 );
 
@@ -568,7 +569,27 @@ grant execute on function public.keepalive() to anon;</pre>
                             <label class="block text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-2" data-i18n="lbl_cemail">Email Cliente</label>
                             <input type="email" id="in-cemail" class="ifield" placeholder="client@email.com">
                         </div>
+                        <div>
+                            <label class="block text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-2" data-i18n="lbl_ctype">Client type</label>
+                            <select id="in-ctype" class="ifield" onchange="onClientTypeChange()">
+                                <option value="business" data-i18n="opt_business">Business</option>
+                                <option value="private" data-i18n="opt_private">Private person</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-2" data-i18n="lbl_ccountry">Client country</label>
+                            <select id="in-ccountry" class="ifield" onchange="recalc()"></select>
+                        </div>
+                        <div id="in-cvat-wrap">
+                            <label class="block text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-2" data-i18n="lbl_cvat">Client VAT number</label>
+                            <input type="text" id="in-cvat" class="ifield" placeholder="IT12345678901" autocomplete="off">
+                        </div>
+                        <div class="sm:col-span-2">
+                            <label class="block text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-2" data-i18n="lbl_caddr">Client address</label>
+                            <textarea id="in-caddr" rows="2" class="ifield resize-none" placeholder="Via Roma 1&#10;10022 Carmagnola (TO)"></textarea>
+                        </div>
                     </div>
+                    <div id="in-treat" class="mt-4 rounded-xl border border-gray-800 bg-black px-4 py-3 text-xs space-y-1"></div>
                 </div>
 
                 <!-- Line items -->
@@ -616,6 +637,10 @@ grant execute on function public.keepalive() to anon;</pre>
                     <div>
                         <label class="block text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-2" data-i18n="lbl_due">Scadenza Pagamento</label>
                         <input type="date" id="in-due" class="ifield">
+                    </div>
+                    <div class="sm:col-span-2">
+                        <label class="block text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-2" data-i18n="lbl_svc">Service date or period</label>
+                        <input type="text" id="in-svc" class="ifield" data-phi="ph_svc">
                     </div>
                 </div>
 
@@ -695,6 +720,8 @@ grant execute on function public.keepalive() to anon;</pre>
                 <div class="text-right">
                     <div class="text-[10px] text-gray-400 uppercase font-bold mb-1" data-i18n="cv_to">A</div>
                     <div class="font-black text-gray-900" id="cv-to">Client</div>
+                    <div class="text-[11px] text-gray-400 whitespace-pre-line" id="cv-caddr"></div>
+                    <div class="text-[11px] text-gray-400" id="cv-cvat"></div>
                     <div class="text-[11px] text-gray-400" id="cv-email"></div>
                 </div>
             </div>
@@ -726,7 +753,9 @@ grant execute on function public.keepalive() to anon;</pre>
                     <span id="cv-issue"></span>
                     <span id="cv-due" class="font-bold text-gray-600"></span>
                 </div>
-                <div id="cv-notes" class="mt-2 text-xs text-gray-400 italic"></div>
+                <div id="cv-svc" class="mt-1 text-xs text-gray-400"></div>
+                <div id="cv-notes" class="mt-2 text-xs text-gray-400 italic whitespace-pre-line"></div>
+                <div id="cv-legal" class="mt-2 text-[11px] text-gray-500 space-y-0.5"></div>
             </div>
 
             <!-- Pay: one-tap link, SEPA QR, and copyable bank details -->
@@ -892,7 +921,6 @@ grant execute on function public.keepalive() to anon;</pre>
                         <option value="PL">🇵🇱 PL</option>
                         <option value="SE">🇸🇪 SE</option>
                         <option value="US">🇺🇸 US</option>
-                        <option value="CA">🇨🇦 CA</option>
                         <option value="AU">🇦🇺 AU</option>
                     </select>
                 </div>
@@ -976,8 +1004,9 @@ grant execute on function public.keepalive() to anon;</pre>
                 <h3 class="text-[10px] font-black uppercase tracking-widest text-gray-500 mb-4" data-i18n="set_regime">Regime Fiscale Speciale</h3>
                 <div id="toggle-ritenuta-wrap" class="hidden flex items-center justify-between py-3 border-b border-gray-800">
                     <div>
-                        <div class="text-sm font-bold text-white" data-i18n="set_ritenuta">Ritenuta d'Acconto (20%)</div>
-                        <div class="text-[11px] text-gray-600 mt-0.5">Deduzione del 20% dal totale</div>
+                        <div class="text-sm font-bold text-white" id="wh-title">Ritenuta d'acconto</div>
+                        <div class="text-[11px] text-gray-600 mt-0.5" data-i18n="set_wh_sub">Only for business clients in your country.</div>
+                        <select id="s-wh-opt" class="ifield text-xs py-2 mt-2 hidden" style="width:auto"></select>
                     </div>
                     <button type="button" id="toggle-ritenuta" onclick="toggleRegime('ritenuta')" class="w-12 h-6 rounded-full transition-colors relative bg-gray-800">
                         <span id="toggle-ritenuta-knob" class="absolute top-1 left-1 w-4 h-4 bg-gray-600 rounded-full transition-transform"></span>
@@ -985,8 +1014,8 @@ grant execute on function public.keepalive() to anon;</pre>
                 </div>
                 <div id="toggle-kleinunternehmer-wrap" class="hidden flex items-center justify-between py-3 border-b border-gray-800">
                     <div>
-                        <div class="text-sm font-bold text-white" data-i18n="set_kleinunternehmer">Kleinunternehmer (§19 UStG)</div>
-                        <div class="text-[11px] text-gray-600 mt-0.5">Keine Mehrwertsteuer ausweisen</div>
+                        <div class="text-sm font-bold text-white" id="sb-title">Kleinunternehmerregelung</div>
+                        <div class="text-[11px] text-gray-600 mt-0.5" data-i18n="set_small_sub">No VAT on invoices, with the legal wording.</div>
                     </div>
                     <button type="button" id="toggle-kleinunternehmer" onclick="toggleRegime('kleinunternehmer')" class="w-12 h-6 rounded-full transition-colors relative bg-gray-800">
                         <span id="toggle-kleinunternehmer-knob" class="absolute top-1 left-1 w-4 h-4 bg-gray-600 rounded-full transition-transform"></span>
@@ -1061,6 +1090,7 @@ grant execute on function public.keepalive() to anon;</pre>
 const L = {
   it: {
     nav_exp:'Spese', exp_sub:'Ricevute e IVA da recuperare.', exp_new:'Nuova spesa', exp_date:'Data', exp_vendor:'Fornitore', exp_desc:'Descrizione', exp_amount:'Importo pagato', exp_vat:'IVA', exp_vstd:'{r}% IVA inclusa', exp_v0:'Senza IVA / 0%', exp_vrcout:'Reverse charge: fornitore fuori UE', exp_vrceu:'Reverse charge: fornitore in altro paese UE', exp_rc_hint:'Con il reverse charge non paghi IVA al fornitore: la dichiari e la detrai subito, quindi il saldo è zero.', exp_receipt:'Ricevuta (foto o PDF)', exp_attach:'Allega ricevuta', exp_save:'SALVA SPESA', exp_vat_back:'IVA da recuperare', exp_spent:'speso', exp_empty:'Nessuna spesa ancora.', exp_c_del:'Eliminare questa spesa?', exp_rc_tag:'Reverse charge', t_exp_saved:'Spesa salvata!', t_exp_del:'Spesa eliminata.', t_exp_warn:'Inserisci data, fornitore e importo.', t_rcpt_big:'File troppo grande (max 1,5 MB per i PDF, 10 MB per le foto).', exp_db:'Esegui l\'aggiornamento SQL del database per attivare le spese.', btw_paid:'IVA pagata (detraibile)', btw_pay:'Da versare', btw_back:'Da ricevere', btw_fill:'Valori per la dichiarazione',
+    lbl_ctype:'Tipo di cliente', opt_business:'Azienda / professionista', opt_private:'Privato', lbl_ccountry:'Paese del cliente', lbl_cvat:'Partita IVA del cliente', lbl_caddr:'Indirizzo del cliente', lbl_svc:'Data o periodo della prestazione', ph_svc:'es. novembre 2026', other_country:'Altro paese (fuori UE)', pdf_svc:'PRESTAZIONE', pdf_cvat:'P.IVA', tr_std:'{tax} {r}% sul totale.', tr_rc:'Reverse charge: 0% IVA, il cliente versa l\'IVA nel suo paese.', tr_export:'Cliente fuori dall\'UE: nessuna IVA.', tr_small:'Regime per piccole imprese: nessuna IVA.', tr_none:'Nessuna IVA applicata.', tr_wh:'{label} trattenuta dal totale.', t_need_vat:'Per il reverse charge serve la partita IVA del cliente.', w_it:'Le fatture italiane valgono solo se inviate tramite SDI: questo PDF è una proforma.', w_pt:'In Portogallo vale solo una fattura da software certificato o dal Portal das Finanças: questo PDF è una proforma.', w_pl:'Dal 2026 le fatture polacche tra aziende vanno emesse in KSeF: questo PDF è una proforma.', w_be:'Dal 2026 le fatture tra aziende belghe devono essere e-fatture Peppol: questo PDF è una proforma.', w_fr:'Dal 1 settembre 2027 le fatture tra aziende francesi passano da una piattaforma approvata: questo PDF è una proforma.', w_de:'Dal 2028 le fatture tra aziende tedesche devono essere e-fatture (XRechnung/ZUGFeRD): questo PDF è una proforma.', w_es:'Dal luglio 2027 (forse rinviato al 2028) le fatture spagnole richiedono un software conforme a Verifactu.', note_export:'IVA non applicabile: prestazione fuori dall\'UE (art. 44 Direttiva 2006/112/CE).', note_rc_nonEU:'Reverse charge: l\'imposta è dovuta dal destinatario.', set_small_sub:'Nessuna IVA sulle fatture, con la dicitura di legge.', set_wh_sub:'Solo per clienti aziende nel tuo paese.', wh_waiver:'Esenzione (art. 101.º-B CIRS)', btw_icp:'Presenta anche l\'opgaaf ICP.',
     nav_dash:'Dashboard', nav_inv:'Nuovo Proforma', nav_an:'Analisi', nav_set:'Impostazioni',
     dash_h1:'Dashboard Operativa', dash_sub:'Monitora ore, incassi e stato dei proforma.',
     kpi_tot:'Totale Proforma', kpi_pend:'In Attesa', kpi_appr:'Da Incassare', kpi_tax:'Fondo Tasse',
@@ -1134,6 +1164,7 @@ const L = {
   },
   en: {
     nav_exp:'Expenses', exp_sub:'Receipts and the VAT you can reclaim.', exp_new:'New expense', exp_date:'Date', exp_vendor:'Supplier', exp_desc:'Description', exp_amount:'Amount paid', exp_vat:'VAT', exp_vstd:'{r}% VAT included', exp_v0:'No VAT / 0%', exp_vrcout:'Reverse charge: supplier outside the EU', exp_vrceu:'Reverse charge: supplier in another EU country', exp_rc_hint:'With reverse charge you pay no VAT to the supplier: you declare it and deduct it at once, so it nets to zero.', exp_receipt:'Receipt (photo or PDF)', exp_attach:'Attach receipt', exp_save:'SAVE EXPENSE', exp_vat_back:'VAT to reclaim', exp_spent:'spent', exp_empty:'No expenses yet.', exp_c_del:'Delete this expense?', exp_rc_tag:'Reverse charge', t_exp_saved:'Expense saved!', t_exp_del:'Expense deleted.', t_exp_warn:'Enter date, supplier and amount.', t_rcpt_big:'File too large (max 1.5 MB for PDFs, 10 MB for photos).', exp_db:'Run the database SQL update to enable expenses.', btw_paid:'VAT paid (reclaimable)', btw_pay:'To pay', btw_back:'To get back', btw_fill:'Numbers for your return',
+    lbl_ctype:'Client type', opt_business:'Business', opt_private:'Private person', lbl_ccountry:'Client country', lbl_cvat:'Client VAT number', lbl_caddr:'Client address', lbl_svc:'Service date or period', ph_svc:'e.g. November 2026', other_country:'Other country (outside the EU)', pdf_svc:'SERVICE DATE', pdf_cvat:'VAT no.', tr_std:'{tax} {r}% on the total.', tr_rc:'Reverse charge: 0% VAT, your client accounts for VAT in their country.', tr_export:'Client outside the EU: no VAT.', tr_small:'Small business scheme: no VAT.', tr_none:'No VAT applied.', tr_wh:'{label} deducted from the total.', t_need_vat:'Reverse charge needs your client\'s VAT number.', w_it:'Italian invoices are only valid when sent through SDI: this PDF is a proforma.', w_pt:'In Portugal only invoices from certified software or the Portal das Finanças are valid: this PDF is a proforma.', w_pl:'Since 2026, Polish business-to-business invoices must be issued in KSeF: this PDF is a proforma.', w_be:'Since 2026, invoices between Belgian businesses must be Peppol e-invoices: this PDF is a proforma.', w_fr:'From 1 September 2027, invoices between French businesses go through an approved platform: this PDF is a proforma.', w_de:'From 2028, invoices between German businesses must be e-invoices (XRechnung/ZUGFeRD): this PDF is a proforma.', w_es:'From July 2027 (possibly postponed to 2028), Spanish invoices need Verifactu-compliant software.', note_export:'VAT not applicable: place of supply outside the EU (art. 44 Directive 2006/112/EC).', note_rc_nonEU:'Reverse charge: VAT to be accounted for by the recipient.', set_small_sub:'No VAT on invoices, with the legal wording.', set_wh_sub:'Only for business clients in your country.', wh_waiver:'Waiver (art. 101.º-B CIRS)', btw_icp:'Also file the EU sales listing (opgaaf ICP).',
     nav_dash:'Dashboard', nav_inv:'New Invoice', nav_an:'Analytics', nav_set:'Settings',
     dash_h1:'Operations Dashboard', dash_sub:'Track hours, revenue, and invoice status.',
     kpi_tot:'Total Invoices', kpi_pend:'Pending', kpi_appr:'Outstanding', kpi_tax:'Tax Vault',
@@ -1207,6 +1238,7 @@ const L = {
   },
   nl: {
     nav_exp:'Kosten', exp_sub:'Bonnetjes en de btw die je terugkrijgt.', exp_new:'Nieuwe kosten', exp_date:'Datum', exp_vendor:'Leverancier', exp_desc:'Omschrijving', exp_amount:'Betaald bedrag', exp_vat:'Btw', exp_vstd:'Inclusief {r}% btw', exp_v0:'Geen btw / 0%', exp_vrcout:'Btw verlegd: leverancier buiten de EU', exp_vrceu:'Btw verlegd: leverancier in ander EU-land', exp_rc_hint:'Bij verlegde btw betaal je de leverancier geen btw: je geeft het aan en trekt het meteen weer af, netto € 0.', exp_receipt:'Bonnetje (foto of pdf)', exp_attach:'Bonnetje toevoegen', exp_save:'KOSTEN OPSLAAN', exp_vat_back:'Btw terug', exp_spent:'uitgegeven', exp_empty:'Nog geen kosten.', exp_c_del:'Deze kosten verwijderen?', exp_rc_tag:'Verlegd', t_exp_saved:'Kosten opgeslagen!', t_exp_del:'Kosten verwijderd.', t_exp_warn:'Vul datum, leverancier en bedrag in.', t_rcpt_big:'Bestand te groot (max 1,5 MB voor pdf, 10 MB voor foto’s).', exp_db:'Voer de SQL-update van de database uit om kosten te activeren.', btw_paid:'Voorbelasting', btw_pay:'Te betalen', btw_back:'Terug te krijgen', btw_fill:'Invullen bij je aangifte',
+    lbl_ctype:'Soort klant', opt_business:'Bedrijf / zzp\'er', opt_private:'Particulier', lbl_ccountry:'Land van de klant', lbl_cvat:'Btw-nummer van de klant', lbl_caddr:'Adres van de klant', lbl_svc:'Leverdatum of periode', ph_svc:'bijv. november 2026', other_country:'Ander land (buiten de EU)', pdf_svc:'LEVERDATUM', pdf_cvat:'Btw-nr.', tr_std:'{tax} {r}% over het totaal.', tr_rc:'Btw verlegd: 0% btw, je klant draagt de btw af in eigen land.', tr_export:'Klant buiten de EU: geen btw.', tr_small:'Kleineondernemersregeling: geen btw.', tr_none:'Geen btw berekend.', tr_wh:'{label} ingehouden op het totaal.', t_need_vat:'Voor btw verlegd is het btw-nummer van je klant nodig.', w_it:'Italiaanse facturen zijn alleen geldig via SDI: deze pdf is een proforma.', w_pt:'In Portugal is alleen een factuur uit gecertificeerde software of het Portal das Finanças geldig: deze pdf is een proforma.', w_pl:'Sinds 2026 moeten Poolse facturen tussen bedrijven via KSeF: deze pdf is een proforma.', w_be:'Sinds 2026 moeten facturen tussen Belgische bedrijven Peppol-e-facturen zijn: deze pdf is een proforma.', w_fr:'Vanaf 1 september 2027 lopen facturen tussen Franse bedrijven via een erkend platform: deze pdf is een proforma.', w_de:'Vanaf 2028 moeten facturen tussen Duitse bedrijven e-facturen zijn (XRechnung/ZUGFeRD): deze pdf is een proforma.', w_es:'Vanaf juli 2027 (mogelijk uitgesteld tot 2028) vragen Spaanse facturen om Verifactu-software.', note_export:'Btw niet van toepassing: dienst buiten de EU (art. 44 Richtlijn 2006/112/EG).', note_rc_nonEU:'Verlegd: de btw wordt afgedragen door de afnemer.', set_small_sub:'Geen btw op facturen, met de verplichte vermelding.', set_wh_sub:'Alleen voor zakelijke klanten in je eigen land.', wh_waiver:'Vrijstelling (art. 101.º-B CIRS)', btw_icp:'Dien ook de opgaaf ICP in.',
     nav_dash:'Dashboard', nav_inv:'Nieuwe Factuur', nav_an:'Analyse', nav_set:'Instellingen',
     dash_h1:'Operationeel Dashboard', dash_sub:'Volg uren, omzet en factuurstatus.',
     kpi_tot:'Totaal Facturen', kpi_pend:'In Behandeling', kpi_appr:'Openstaand', kpi_tax:'Belastingreserve',
@@ -1280,6 +1312,7 @@ const L = {
   },
   de: {
     nav_exp:'Ausgaben', exp_sub:'Belege und die Vorsteuer, die du zurückbekommst.', exp_new:'Neue Ausgabe', exp_date:'Datum', exp_vendor:'Lieferant', exp_desc:'Beschreibung', exp_amount:'Bezahlter Betrag', exp_vat:'USt.', exp_vstd:'Inkl. {r}% USt.', exp_v0:'Ohne USt. / 0%', exp_vrcout:'Reverse Charge: Lieferant außerhalb der EU', exp_vrceu:'Reverse Charge: Lieferant in anderem EU-Land', exp_rc_hint:'Beim Reverse Charge zahlst du dem Lieferanten keine USt.: du meldest sie und ziehst sie sofort wieder ab, netto null.', exp_receipt:'Beleg (Foto oder PDF)', exp_attach:'Beleg anhängen', exp_save:'AUSGABE SPEICHERN', exp_vat_back:'Vorsteuer', exp_spent:'ausgegeben', exp_empty:'Noch keine Ausgaben.', exp_c_del:'Diese Ausgabe löschen?', exp_rc_tag:'Reverse Charge', t_exp_saved:'Ausgabe gespeichert!', t_exp_del:'Ausgabe gelöscht.', t_exp_warn:'Datum, Lieferant und Betrag eingeben.', t_rcpt_big:'Datei zu groß (max. 1,5 MB für PDFs, 10 MB für Fotos).', exp_db:'Führe das SQL-Update der Datenbank aus, um Ausgaben zu aktivieren.', btw_paid:'Vorsteuer', btw_pay:'Zu zahlen', btw_back:'Erstattung', btw_fill:'Werte für die Erklärung',
+    lbl_ctype:'Kundenart', opt_business:'Unternehmen', opt_private:'Privatperson', lbl_ccountry:'Land des Kunden', lbl_cvat:'USt-IdNr. des Kunden', lbl_caddr:'Adresse des Kunden', lbl_svc:'Leistungsdatum oder -zeitraum', ph_svc:'z.B. November 2026', other_country:'Anderes Land (außerhalb der EU)', pdf_svc:'LEISTUNGSDATUM', pdf_cvat:'USt-IdNr.', tr_std:'{tax} {r}% auf den Betrag.', tr_rc:'Reverse Charge: 0% USt., dein Kunde führt die Steuer in seinem Land ab.', tr_export:'Kunde außerhalb der EU: keine USt.', tr_small:'Kleinunternehmerregelung: keine USt.', tr_none:'Keine USt. berechnet.', tr_wh:'{label} wird vom Betrag einbehalten.', t_need_vat:'Für Reverse Charge wird die USt-IdNr. des Kunden benötigt.', w_it:'Italienische Rechnungen gelten nur über SDI: dieses PDF ist eine Proforma.', w_pt:'In Portugal gilt nur eine Rechnung aus zertifizierter Software oder dem Portal das Finanças: dieses PDF ist eine Proforma.', w_pl:'Seit 2026 müssen polnische B2B-Rechnungen über KSeF laufen: dieses PDF ist eine Proforma.', w_be:'Seit 2026 müssen Rechnungen zwischen belgischen Unternehmen Peppol-E-Rechnungen sein: dieses PDF ist eine Proforma.', w_fr:'Ab 1. September 2027 laufen Rechnungen zwischen französischen Unternehmen über eine zugelassene Plattform: dieses PDF ist eine Proforma.', w_de:'Ab 2028 müssen Rechnungen zwischen deutschen Unternehmen E-Rechnungen sein (XRechnung/ZUGFeRD): dieses PDF ist eine Proforma.', w_es:'Ab Juli 2027 (evtl. verschoben auf 2028) brauchen spanische Rechnungen Verifactu-konforme Software.', note_export:'Nicht steuerbar: Leistungsort außerhalb der EU (Art. 44 Richtlinie 2006/112/EG).', note_rc_nonEU:'Reverse Charge: Steuerschuldnerschaft des Leistungsempfängers.', set_small_sub:'Keine USt. auf Rechnungen, mit Pflichthinweis.', set_wh_sub:'Nur bei Geschäftskunden im eigenen Land.', wh_waiver:'Befreiung (art. 101.º-B CIRS)', btw_icp:'Auch die Zusammenfassende Meldung (opgaaf ICP) abgeben.',
     nav_dash:'Dashboard', nav_inv:'Neue Rechnung', nav_an:'Analyse', nav_set:'Einstellungen',
     dash_h1:'Betriebsdashboard', dash_sub:'Stunden, Umsatz und Rechnungsstatus verfolgen.',
     kpi_tot:'Rechnungen Gesamt', kpi_pend:'Ausstehend', kpi_appr:'Offene Posten', kpi_tax:'Steuerrücklage',
@@ -1360,23 +1393,23 @@ const COUNTRIES = {
        id2:{it:'Codice Fiscale',en:'Fiscal Code'}, id2Ph:'RSSMRA80A01H501U',
        requiresIBAN:true, extraToggles:['ritenuta'] },
   NL:{ name:{it:'Paesi Bassi',en:'Netherlands'}, currency:'EUR', vatRate:21, taxName:'BTW',
-       id1:{it:'KVK Nummer',en:'KVK Number',nl:'KvK-nummer',de:'KVK-Nummer'}, id1Ph:'12345678',
-       id2:{it:'BTW Nummer',en:'VAT ID',nl:'Btw-id',de:'USt-IdNr.'}, id2Ph:'NL123456789B01',
+       id1:{it:'KVK-nummer',en:'KVK-nummer'}, id1Ph:'12345678',
+       id2:{it:'Btw-id',en:'Btw-id'}, id2Ph:'NL123456789B01',
        requiresIBAN:true, extraToggles:[] },
   DE:{ name:{it:'Germania',en:'Germany'}, currency:'EUR', vatRate:19, taxName:'MwSt',
        id1:{it:'Steuernummer',en:'Tax Number'}, id1Ph:'12/345/67890',
        id2:{it:'USt-IdNr.',en:'VAT ID'}, id2Ph:'DE123456789',
        requiresIBAN:true, extraToggles:['kleinunternehmer'] },
   GB:{ name:{it:'Regno Unito',en:'United Kingdom'}, currency:'GBP', vatRate:20, taxName:'VAT',
-       id1:{it:'UTR Number',en:'UTR Number'}, id1Ph:'1234567890',
-       id2:{it:'VAT Number',en:'VAT Number'}, id2Ph:'GB123456789',
+       id1:{it:'VAT Number',en:'VAT Number'}, id1Ph:'GB123456789',
+       id2:{it:'Company number (opzionale)',en:'Company number (optional)'}, id2Ph:'12345678',
        requiresIBAN:false, extraToggles:[] },
   FR:{ name:{it:'Francia',en:'France'}, currency:'EUR', vatRate:20, taxName:'TVA',
-       id1:{it:'SIRET',en:'SIRET'}, id1Ph:'12345678901234',
+       id1:{it:'SIREN / SIRET',en:'SIREN / SIRET'}, id1Ph:'123 456 789 00012',
        id2:{it:'Numero TVA',en:'VAT Number'}, id2Ph:'FR12345678901',
        requiresIBAN:true, extraToggles:['autoentrepreneur'] },
   ES:{ name:{it:'Spagna',en:'Spain'}, currency:'EUR', vatRate:21, taxName:'IVA',
-       id1:{it:'NIF/CIF',en:'NIF/CIF'}, id1Ph:'B12345678',
+       id1:{it:'NIF',en:'NIF'}, id1Ph:'12345678Z',
        id2:{it:'',en:''}, id2Ph:'',
        requiresIBAN:true, extraToggles:[] },
   PT:{ name:{it:'Portogallo',en:'Portugal'}, currency:'EUR', vatRate:23, taxName:'IVA',
@@ -1384,11 +1417,11 @@ const COUNTRIES = {
        id2:{it:'',en:''}, id2Ph:'',
        requiresIBAN:true, extraToggles:[] },
   CH:{ name:{it:'Svizzera',en:'Switzerland'}, currency:'CHF', vatRate:8.1, taxName:'MWST',
-       id1:{it:'UID-Nummer',en:'UID Number'}, id1Ph:'CHE-123.456.789',
+       id1:{it:'UID-Nummer',en:'UID-Nummer'}, id1Ph:'CHE-123.456.789 MWST',
        id2:{it:'',en:''}, id2Ph:'',
        requiresIBAN:true, extraToggles:[] },
   US:{ name:{it:'Stati Uniti',en:'United States'}, currency:'USD', vatRate:0, taxName:'Tax',
-       id1:{it:'EIN',en:'EIN'}, id1Ph:'12-3456789',
+       id1:{it:'EIN (opzionale)',en:'EIN (optional)'}, id1Ph:'12-3456789',
        id2:{it:'',en:''}, id2Ph:'',
        requiresIBAN:false, extraToggles:[] },
   AU:{ name:{it:'Australia',en:'Australia'}, currency:'AUD', vatRate:10, taxName:'GST',
@@ -1401,23 +1434,23 @@ const COUNTRIES = {
        requiresIBAN:false, extraToggles:[] },
   PL:{ name:{it:'Polonia',en:'Poland',nl:'Polen',de:'Polen'}, currency:'PLN', vatRate:23, taxName:'VAT',
        id1:{it:'NIP',en:'NIP'}, id1Ph:'1234567890',
-       id2:{it:'REGON',en:'REGON'}, id2Ph:'123456789',
+       id2:{it:'REGON (opzionale)',en:'REGON (optional)'}, id2Ph:'123456789',
        requiresIBAN:true, extraToggles:[] },
   BE:{ name:{it:'Belgio',en:'Belgium',nl:'België',de:'Belgien'}, currency:'EUR', vatRate:21, taxName:'BTW',
        id1:{it:'Numero d\'impresa',en:'Enterprise Number',nl:'Ondernemingsnummer',de:'Unternehmensnummer'}, id1Ph:'0123.456.789',
        id2:{it:'Partita IVA',en:'VAT ID',nl:'Btw-nummer',de:'USt-IdNr.'}, id2Ph:'BE0123456789',
        requiresIBAN:true, extraToggles:[] },
   AT:{ name:{it:'Austria',en:'Austria',nl:'Oostenrijk',de:'Österreich'}, currency:'EUR', vatRate:20, taxName:'USt',
-       id1:{it:'Steuernummer',en:'Tax Number',de:'Steuernummer'}, id1Ph:'12 345/6789',
-       id2:{it:'UID',en:'VAT ID',de:'UID-Nummer'}, id2Ph:'ATU12345678',
+       id1:{it:'UID-Nummer',en:'UID-Nummer'}, id1Ph:'ATU12345678',
+       id2:{it:'',en:''}, id2Ph:'',
        requiresIBAN:true, extraToggles:[] },
   IE:{ name:{it:'Irlanda',en:'Ireland',nl:'Ierland',de:'Irland'}, currency:'EUR', vatRate:23, taxName:'VAT',
-       id1:{it:'Tax Reference',en:'Tax Reference'}, id1Ph:'1234567T',
-       id2:{it:'VAT Number',en:'VAT Number'}, id2Ph:'IE1234567T',
+       id1:{it:'VAT Number',en:'VAT Number'}, id1Ph:'IE1234567T',
+       id2:{it:'',en:''}, id2Ph:'',
        requiresIBAN:true, extraToggles:[] },
   SE:{ name:{it:'Svezia',en:'Sweden'}, currency:'SEK', vatRate:25, taxName:'Moms',
-       id1:{it:'Org. nummer',en:'Org. Number'}, id1Ph:'556123-4567',
-       id2:{it:'Moms-nr.',en:'VAT Number'}, id2Ph:'SE123456789001',
+       id1:{it:'Org.nr / Personnummer',en:'Org.nr / Personnummer'}, id1Ph:'556123-4567',
+       id2:{it:'Momsreg.nr',en:'Momsreg.nr'}, id2Ph:'SE123456789001',
        requiresIBAN:true, extraToggles:[] },
 };
 
@@ -1440,6 +1473,142 @@ let S = {
 let revChart = null;
 let itemIdx  = 0;
 
+
+// ── TAX RULES (audited Nov 2026: see PR description for sources) ─────
+// Legal lines use the seller's official language because that is what each tax authority checks.
+const EU = ['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE'];
+const CLIENT_COUNTRIES = [...EU, 'GB','CH','NO','US','CA','AU','XX'];
+const TAX = {
+  NL: { rates:[21,9,0], rc:'Btw verlegd',
+        small:{ name:'Kleineondernemersregeling (KOR)', note:'Vrijgesteld van btw op grond van de kleineondernemersregeling (art. 25 Wet OB).' } },
+  BE: { rates:[21,12,6,0], rc:'Verlegging van heffing',
+        small:{ name:'Vrijstellingsregeling kleine ondernemingen', note:'Bijzondere vrijstellingsregeling kleine ondernemingen.' } },
+  DE: { rates:[19,7,0], rc:'Steuerschuldnerschaft des Leistungsempfängers',
+        small:{ name:'Kleinunternehmerregelung (§ 19 UStG)', note:'Steuerfreie Leistung gemäß § 19 UStG (Kleinunternehmerregelung).' } },
+  AT: { rates:[20,13,10,4.9,0], rc:'Übergang der Steuerschuld auf den Leistungsempfänger',
+        small:{ name:'Kleinunternehmerregelung', note:'Umsatzsteuerfrei aufgrund der Kleinunternehmerregelung gemäß § 6 Abs. 1 Z 27 UStG.' } },
+  IT: { rates:[22,10,5,4,0], rc:'Inversione contabile',
+        small:{ name:'Regime forfettario', note:[
+          "Operazione effettuata ai sensi dell'art. 1, commi da 54 a 89, della Legge n. 190/2014, senza applicazione dell'IVA.",
+          "Compenso non soggetto a ritenuta d'acconto ai sensi dell'art. 1, comma 67, della Legge n. 190/2014."] },
+        wh:{ name:"Ritenuta d'acconto", opts:[20], label:r => `Ritenuta d'acconto ${r}%`,
+             note:(r, d) => d >= '2027-01-01'
+               ? `Compenso soggetto a ritenuta d'acconto del ${r}% ai sensi dell'art. 38 del D.Lgs. n. 33/2025.`
+               : `Compenso soggetto a ritenuta d'acconto del ${r}% ai sensi dell'art. 25 del DPR 600/1973.` } },
+  FR: { rates:[20,10,5.5,2.1,0], rc:'Autoliquidation',
+        small:{ name:'Franchise en base de TVA', note:d => d >= '2027-01-01'
+          ? 'TVA non applicable, article L. 233-3 du CIBS.' : 'TVA non applicable, art. 293 B du CGI.' } },
+  ES: { rates:[21,10,4,0], rc:'Inversión del sujeto pasivo',
+        wh:{ name:'Retención IRPF', opts:[15,7], label:r => `Retención IRPF ${r}%`,
+             note:r => r === 7 ? 'Retención IRPF del 7% por inicio de actividad (art. 95.1 RIRPF).' : '' } },
+  PT: { rates:[23,13,6,0], rc:'IVA - autoliquidação',
+        small:{ name:'Regime de isenção (art. 53.º CIVA)', note:'IVA - regime de isenção (art. 53.º do CIVA).' },
+        wh:{ name:'Retenção na fonte (IRS)', opts:[23,'waiver'], label:r => `Retenção na fonte IRS ${r}%`, note:() => '',
+             waiverNote:'Sem retenção, nos termos do n.º 1 do artigo 101.º-B do Código do IRS.' } },
+  IE: { rates:[23,13.5,9,0], rc:'Reverse charge applies', small:{ name:'Not registered for VAT', note:'' } },
+  PL: { rates:[23,8,5,0], rc:'Odwrotne obciążenie',
+        small:{ name:'Zwolnienie podmiotowe (art. 113)', note:'Zwolnienie z VAT na podstawie art. 113 ust. 1 ustawy o VAT.' } },
+  SE: { rates:[25,12,6,0], rc:'Omvänd betalningsskyldighet', always:['Godkänd för F-skatt.'],
+        small:{ name:'Undantagen från skatteplikt (momsbefrielse)', note:'Undantagen från skatteplikt.' } },
+  GB: { rates:[20,5,0], small:{ name:'Not VAT registered', note:'' } },
+  CH: { rates:[8.1,3.8,2.6,0], small:{ name:'Nicht MWST-pflichtig', note:'' } },
+  US: { rates:[0] },
+  AU: { rates:[10,0], small:{ name:'Not registered for GST', note:'' } },
+  CA: { rates:[5,0] },
+};
+const RC_SUFFIX = 'Reverse charge (art. 196 Directive 2006/112/EC).';
+
+function regionName(code) {
+  if (code === 'XX') return t('other_country');
+  try { return new Intl.DisplayNames([LOCALES[S.lang] || 'en-GB'], { type: 'region' }).of(code); } catch { return code; }
+}
+
+function taxOf(country) { return TAX[country] || { rates:[0] }; }
+
+// Decide VAT, withholding, legal lines and validity for one invoice.
+function computeTreatment({ seller, small, vatOn, stdRate, clientType, clientCountry, date, whOn, whOpt, subtotal }) {
+  const tx = taxOf(seller);
+  const business = clientType === 'business';
+  const sellerEU = EU.includes(seller), clientEU = EU.includes(clientCountry);
+  const foreign = clientCountry && clientCountry !== seller;
+  const out = { kind: 'standard', vatRate: 0, whRate: 0, whLabel: '', legal: [], warnings: [], proforma: false, needClientVat: false };
+
+  if (business && foreign && clientEU) {
+    out.kind = 'rc_eu'; out.needClientVat = true;
+    out.legal.push(sellerEU && tx.rc ? (tx.rc === 'Reverse charge applies' ? `${tx.rc} (art. 196 Directive 2006/112/EC).` : `${tx.rc}. ${RC_SUFFIX}`) : t('note_rc_nonEU'));
+  } else if (business && foreign && sellerEU && !clientEU) {
+    out.kind = 'export'; out.legal.push(t('note_export'));
+  } else if (small && tx.small) {
+    out.kind = 'small';
+    const n = typeof tx.small.note === 'function' ? tx.small.note(date) : tx.small.note;
+    (Array.isArray(n) ? n : [n]).filter(Boolean).forEach(x => out.legal.push(x));
+  } else if (vatOn) {
+    out.vatRate = stdRate;
+  } else {
+    out.kind = 'none';
+  }
+
+  // Withholding: only business clients in the seller's own country, never under a small-business regime
+  if (tx.wh && whOn && business && !foreign && !small) {
+    if (whOpt === 'waiver') { if (tx.wh.waiverNote) out.legal.push(tx.wh.waiverNote); }
+    else {
+      const r = tx.wh.opts.includes(Number(whOpt)) ? Number(whOpt) : tx.wh.opts[0];
+      out.whRate = r; out.whLabel = tx.wh.label(r);
+      const note = tx.wh.note(r, date); if (note) out.legal.push(note);
+    }
+  }
+  if (tx.always) out.legal.push(...tx.always);
+  // Italian €2 stamp duty on invoices over €77.47 without VAT
+  if (seller === 'IT' && out.vatRate === 0 && subtotal > 77.47)
+    out.legal.push('Imposta di bollo da 2 euro assolta in modo virtuale ai sensi del DM 17/06/2014.');
+
+  // Where a PDF is not a legally valid invoice, mark it as a proforma and say why
+  const domesticB2B = business && !foreign;
+  if (seller === 'IT') { out.proforma = true; out.warnings.push('w_it'); }
+  else if (seller === 'PT') { out.proforma = true; out.warnings.push('w_pt'); }
+  else if (seller === 'PL' && business) { out.proforma = true; out.warnings.push('w_pl'); }
+  else if (seller === 'BE' && domesticB2B) { out.proforma = true; out.warnings.push('w_be'); }
+  else if (seller === 'FR' && domesticB2B && date >= '2027-09-01') { out.proforma = true; out.warnings.push('w_fr'); }
+  else if (seller === 'DE' && domesticB2B && !small && date >= '2028-01-01') { out.proforma = true; out.warnings.push('w_de'); }
+  if (seller === 'ES' && date >= '2027-07-01') out.warnings.push('w_es');
+  return out;
+}
+
+function formTreatment(subtotal) {
+  const v = parseFloat(S.settings.vatOnInvoice);
+  return computeTreatment({
+    seller: S.settings.country || 'IT',
+    small: !!(S.settings.kleinunternehmer || S.settings.autoentrepreneur),
+    vatOn: !!S.settings.vatEnabled,
+    stdRate: Number.isFinite(v) ? v : taxOf(S.settings.country).rates[0],
+    clientType: document.getElementById('in-ctype')?.value || 'business',
+    clientCountry: document.getElementById('in-ccountry')?.value || S.settings.country,
+    date: document.getElementById('in-issue')?.value || new Date().toISOString().slice(0, 10),
+    whOn: !!S.settings.ritenuta, whOpt: (S.settings.options || {}).whOpt,
+    subtotal,
+  });
+}
+
+function onClientTypeChange() {
+  const business = document.getElementById('in-ctype').value === 'business';
+  document.getElementById('in-cvat-wrap').classList.toggle('hidden', !business);
+  recalc();
+}
+
+function fillClientCountries(selected) {
+  const sel = document.getElementById('in-ccountry');
+  if (!sel) return;
+  const seller = S.settings.country || 'IT';
+  const list = [...new Set([seller, ...CLIENT_COUNTRIES])];
+  sel.innerHTML = '';
+  list.forEach(code => {
+    const o = document.createElement('option');
+    o.value = code; o.textContent = (COUNTRY_FLAGS[code] ? COUNTRY_FLAGS[code] + ' ' : '') + regionName(code);
+    sel.appendChild(o);
+  });
+  sel.value = selected && list.includes(selected) ? selected : seller;
+}
+
 // ── HELPERS ───────────────────────────────────────────────────────────
 function t(k) { return L[S.lang][k] || L.it[k] || k; }
 function sym() { return { EUR:'€', USD:'$', GBP:'£', CHF:'Fr.', AUD:'A$', CAD:'C$', DKK:'kr', SEK:'kr', NOK:'kr', PLN:'zł' }[S.settings.currency] || '€'; }
@@ -1461,9 +1630,22 @@ function withInvoiceContext(inv, fn) {
   if (inv.currency) S.settings.currency = inv.currency;
   try { return fn(); } finally { S.lang = lang; S.settings.currency = cur; }
 }
-function docTypeLabel(sellerCountry) {
-  if (S.lang === 'it' && sellerCountry && sellerCountry !== 'IT') return t('pdf_invoice_it');
-  return t('pdf_type');
+function docTypeLabel(inv) {
+  const seller = inv.sellerCountry || S.settings.country || 'IT';
+  const proforma = typeof inv.proforma === 'boolean' ? inv.proforma : seller === 'IT';
+  if (proforma) return 'PROFORMA';
+  if (seller === 'AU' && parseFloat(inv.vatAmount) > 0) return 'TAX INVOICE';
+  return S.lang === 'it' ? t('pdf_invoice_it') : t('pdf_type');
+}
+
+// Legal lines for invoices saved before tax treatments were recorded
+function legacyLegal() {
+  const tx = taxOf(S.settings.country);
+  if ((S.settings.kleinunternehmer || S.settings.autoentrepreneur) && tx.small) {
+    const n = typeof tx.small.note === 'function' ? tx.small.note('2026-01-01') : tx.small.note;
+    return (Array.isArray(n) ? n : [n]).filter(Boolean);
+  }
+  return [];
 }
 function clientLink(inv) {
   return inv.publicToken ? `${location.origin}${location.pathname}?token=${inv.publicToken}` : '';
@@ -1503,7 +1685,7 @@ function toast(ico, msg) {
 // ── I18N ──────────────────────────────────────────────────────────────
 function applyTr() {
   document.querySelectorAll('[data-i18n]').forEach(el => {
-    if (el.tagName === 'BUTTON' || el.tagName === 'SPAN' || el.tagName === 'DIV' || el.tagName === 'P' || el.tagName === 'H1' || el.tagName === 'H2' || el.tagName === 'H3' || el.tagName === 'LABEL') {
+    if (el.tagName === 'BUTTON' || el.tagName === 'SPAN' || el.tagName === 'DIV' || el.tagName === 'P' || el.tagName === 'H1' || el.tagName === 'H2' || el.tagName === 'H3' || el.tagName === 'LABEL' || el.tagName === 'OPTION') {
       el.textContent = t(el.dataset.i18n);
     }
   });
@@ -1548,7 +1730,7 @@ function onCountryChange(userChanged = false) {
     Array.from(sel.options).forEach(opt => {
       const cc = opt.value;
       const cn = COUNTRIES[cc];
-      if (cn) opt.textContent = `${COUNTRY_FLAGS[cc]||''} ${cn.name[S.lang]||cn.name.en}`;
+      if (cn) opt.textContent = `${COUNTRY_FLAGS[cc]||''} ${regionName(cc)}`;
     });
   }
 
@@ -1579,15 +1761,25 @@ function onCountryChange(userChanged = false) {
   const curEl = document.getElementById('s-cur');
   if (curEl && curEl.value !== c.currency) curEl.value = c.currency;
 
-  // Special regime toggles
+  // Small-business scheme and withholding come from the audited TAX rules
+  const tx = taxOf(code);
   const regimeCard = document.getElementById('regime-card');
   if (regimeCard) {
-    const hasToggles = c.extraToggles.length > 0;
-    regimeCard.classList.toggle('hidden', !hasToggles);
-    ['ritenuta','kleinunternehmer','autoentrepreneur'].forEach(key => {
-      const wrap = document.getElementById(`toggle-${key}-wrap`);
-      if (wrap) wrap.classList.toggle('hidden', !c.extraToggles.includes(key));
-    });
+    regimeCard.classList.toggle('hidden', !tx.small && !tx.wh);
+    document.getElementById('toggle-kleinunternehmer-wrap').classList.toggle('hidden', !tx.small);
+    document.getElementById('toggle-ritenuta-wrap').classList.toggle('hidden', !tx.wh);
+    document.getElementById('toggle-autoentrepreneur-wrap').classList.add('hidden');
+    if (tx.small) document.getElementById('sb-title').textContent = tx.small.name;
+    if (tx.wh) {
+      document.getElementById('wh-title').textContent = tx.wh.name;
+      const sel = document.getElementById('s-wh-opt');
+      sel.innerHTML = '';
+      tx.wh.opts.forEach(o => { const op = document.createElement('option'); op.value = String(o);
+        op.textContent = o === 'waiver' ? t('wh_waiver') : `${o}%`; sel.appendChild(op); });
+      sel.classList.toggle('hidden', tx.wh.opts.length < 2);
+      const cur = String((S.settings.options || {}).whOpt ?? tx.wh.opts[0]);
+      sel.value = tx.wh.opts.map(String).includes(cur) ? cur : String(tx.wh.opts[0]);
+    }
   }
 
   // Update preview label in invoice form
@@ -1885,9 +2077,10 @@ async function loadApp() {
         vatOnInvoice:     parseFloat(d.vat_on_invoice)  ?? 22,
         vatEnabled:       d.vat_enabled      !== false,
         ritenuta:         d.ritenuta         === true,
-        kleinunternehmer: d.kleinunternehmer === true,
-        autoentrepreneur: d.autoentrepreneur === true,
+        kleinunternehmer: d.kleinunternehmer === true || d.autoentrepreneur === true,
+        autoentrepreneur: false,
         logo:             safeLogo(d.logo),
+        options:          (d.options && typeof d.options === 'object') ? d.options : {},
         terms:            d.terms            || '',
         dueDays:          parseInt(d.due_days)           || 30,
       };
@@ -1929,6 +2122,15 @@ function dbToInv(r) {
     docLang:        (r.meta && r.meta.lang)     || '',
     currency:       (r.meta && r.meta.currency) || '',
     sellerCountry:  (r.meta && r.meta.country)  || '',
+    clientType:     (r.meta && r.meta.clientType)    || '',
+    clientCountry:  (r.meta && r.meta.clientCountry) || '',
+    clientVat:      (r.meta && r.meta.clientVat)     || '',
+    clientAddress:  (r.meta && r.meta.clientAddress) || '',
+    serviceDate:    (r.meta && r.meta.serviceDate)   || '',
+    kind:           (r.meta && r.meta.kind)          || '',
+    legal:          (r.meta && Array.isArray(r.meta.legal)) ? r.meta.legal : null,
+    whLabel:        (r.meta && r.meta.whLabel)       || '',
+    proforma:       r.meta && typeof r.meta.proforma === 'boolean' ? r.meta.proforma : null,
     createdAt:      r.created_at,
   };
 }
@@ -1953,7 +2155,10 @@ function invToDb(inv) {
     freelancer_iban:  S.settings.iban      || null,
     freelancer_name:  S.settings.name      || null,
     pay_link:         inv.payLink          || null,
-    meta:             { lang: inv.docLang || S.lang, currency: S.settings.currency || 'EUR', country: S.settings.country || 'IT' },
+    meta:             { lang: inv.docLang || S.lang, currency: S.settings.currency || 'EUR', country: S.settings.country || 'IT',
+                        clientType: inv.clientType, clientCountry: inv.clientCountry, clientVat: inv.clientVat || '',
+                        clientAddress: inv.clientAddress || '', serviceDate: inv.serviceDate || '', kind: inv.kind,
+                        legal: inv.legal || [], whLabel: inv.whLabel || '', proforma: !!inv.proforma },
     created_at:       inv.createdAt,
   };
 }
@@ -2093,13 +2298,13 @@ function recalc() {
                 (parseFloat(document.getElementById(`r-${n}`)?.value)||0);
   });
 
-  const vatEnabled = S.settings.vatEnabled && !S.settings.kleinunternehmer && !S.settings.autoentrepreneur;
-  // Use the saved rate: the Settings input is filled with the first country's default until Settings is opened
-  const savedRate  = parseFloat(S.settings.vatOnInvoice);
-  const vatPct     = vatEnabled ? (Number.isFinite(savedRate) ? savedRate : ((COUNTRIES[S.settings.country] || COUNTRIES.IT).vatRate)) : 0;
+  const tr         = formTreatment(subtotal);
+  const vatPct     = tr.vatRate;
+  const vatEnabled = vatPct > 0;
   const vatAmt     = subtotal * vatPct / 100;
-  const ritenuta   = S.settings.ritenuta ? subtotal * 0.20 : 0;
+  const ritenuta   = subtotal * tr.whRate / 100;
   const total      = subtotal + vatAmt - ritenuta;
+  renderTreatmentBox(tr);
 
   const code = S.settings.country || 'IT';
   const c    = COUNTRIES[code] || COUNTRIES.IT;
@@ -2117,10 +2322,25 @@ function recalc() {
   if (vatEl)  vatEl.textContent  = fmt(vatAmt);
   if (vatRow) vatRow.classList.toggle('hidden', !vatEnabled || vatPct === 0);
   if (ritEl)  ritEl.textContent  = `- ${fmt(ritenuta)}`;
-  if (ritRow) ritRow.classList.toggle('hidden', !S.settings.ritenuta);
+  if (ritRow) ritRow.classList.toggle('hidden', !ritenuta);
+  const ritLbl = document.querySelector('#preview-ritenuta-row [data-i18n="lbl_ritenuta"]');
+  if (ritLbl && tr.whLabel) ritLbl.textContent = tr.whLabel;
   if (totEl)  totEl.textContent  = fmt(total);
 
-  return { subtotal, vatAmt, vatPct, ritenuta, total };
+  return { subtotal, vatAmt, vatPct, ritenuta, total, tr };
+}
+
+function renderTreatmentBox(tr) {
+  const box = document.getElementById('in-treat');
+  if (!box) return;
+  const c = COUNTRIES[S.settings.country] || COUNTRIES.IT;
+  const msg = { standard: t('tr_std').replace('{tax}', c.taxName).replace('{r}', tr.vatRate), rc_eu: t('tr_rc'),
+    export: t('tr_export'), small: t('tr_small'), none: t('tr_none') }[tr.kind];
+  const lines = [`<div class="text-gray-300">${esc(msg)}</div>`];
+  if (tr.whRate) lines.push(`<div class="text-gray-400">${esc(t('tr_wh').replace('{label}', tr.whLabel))}</div>`);
+  tr.legal.forEach(l => lines.push(`<div class="text-gray-500 italic">${esc(l)}</div>`));
+  tr.warnings.forEach(w => lines.push(`<div class="text-yellow-300">⚠️ ${esc(t(w))}</div>`));
+  box.innerHTML = lines.join('');
 }
 
 function getItems() {
@@ -2148,6 +2368,9 @@ function initInvForm() {
   document.getElementById('in-due').value   = dd.toISOString().split('T')[0];
   document.getElementById('in-notes').value = S.settings.terms || '';
   document.getElementById('in-lang').value  = S.lang;
+  fillClientCountries();
+  document.getElementById('in-ctype').value = 'business';
+  onClientTypeChange();
 }
 
 // ── GENERATE INVOICE ──────────────────────────────────────────────────
@@ -2164,8 +2387,10 @@ async function generateInvoice(e) {
   btn.disabled = true;
   btn.textContent = '...';
 
-  const { subtotal, vatAmt, vatPct, ritenuta, total } = recalc();
+  const { subtotal, vatAmt, vatPct, ritenuta, total, tr } = recalc();
   if (subtotal <= 0) { toast('⚠️', t('t_neg')); btn.disabled = false; btn.textContent = t('btn_gen'); return; }
+  const clientVat = document.getElementById('in-cvat').value.trim();
+  if (tr.needClientVat && !clientVat) { toast('⚠️', t('t_need_vat')); btn.disabled = false; btn.textContent = t('btn_gen'); document.getElementById('in-cvat').focus(); return; }
   const code = S.settings.country || 'IT';
   const c    = COUNTRIES[code] || COUNTRIES.IT;
   const inv = {
@@ -2177,6 +2402,15 @@ async function generateInvoice(e) {
     notes:          document.getElementById('in-notes').value.trim(),
     payLink,
     docLang:        document.getElementById('in-lang').value,
+    clientType:     document.getElementById('in-ctype').value,
+    clientCountry:  document.getElementById('in-ccountry').value,
+    clientVat,
+    clientAddress:  document.getElementById('in-caddr').value.trim(),
+    serviceDate:    document.getElementById('in-svc').value.trim(),
+    kind:           tr.kind,
+    legal:          tr.legal,
+    whLabel:        tr.whLabel,
+    proforma:       tr.proforma,
     items,
     subtotal:       subtotal.toFixed(2),
     vatAmount:      vatAmt.toFixed(2),
@@ -2226,6 +2460,7 @@ function copyClientLink() {
 }
 
 function resetInvForm() {
+  fillClientCountries();
   itemIdx = 0;
   document.getElementById('items-box').innerHTML = '';
   document.getElementById('inv-form').reset();
@@ -2256,7 +2491,7 @@ async function loadClientView(token) {
     const inv = dbToInv(data);
     if (inv.docLang && L[inv.docLang]) { S.lang = inv.docLang; applyTr(); }
     if (inv.currency) S.settings.currency = inv.currency;
-    document.querySelector('[data-i18n="cv_lbl"]').textContent = docTypeLabel(inv.sellerCountry);
+    document.querySelector('[data-i18n="cv_lbl"]').textContent = docTypeLabel(inv);
 
     document.getElementById('cv-id').textContent    = inv.id;
     document.getElementById('cv-from').textContent  = inv.freelancerName || 'Freelancer';
@@ -2295,6 +2530,14 @@ async function loadClientView(token) {
     document.getElementById('cv-issue').textContent = inv.issueDate ? `${t('issue_lbl')}: ${fmtDate(inv.issueDate)}` : '';
     document.getElementById('cv-due').textContent   = inv.dueDate   ? `${t('due_lbl')}: ${fmtDate(inv.dueDate)}`   : '';
     document.getElementById('cv-notes').textContent = inv.notes || '';
+    document.getElementById('cv-caddr').textContent = inv.clientAddress || '';
+    document.getElementById('cv-cvat').textContent  = inv.clientVat ? `${t('pdf_cvat')}: ${inv.clientVat}` : '';
+    document.getElementById('cv-svc').textContent   = inv.serviceDate ? `${t('lbl_svc')}: ${inv.serviceDate}` : '';
+    const legalEl = document.getElementById('cv-legal');
+    legalEl.innerHTML = '';
+    (inv.legal || []).forEach(line => { const d = document.createElement('div'); d.textContent = line; legalEl.appendChild(d); });
+    const ritLblCv = document.querySelector('#cv-ritenuta-row [data-i18n="lbl_ritenuta"]');
+    if (ritLblCv && inv.whLabel) ritLblCv.textContent = inv.whLabel;
 
     const btn = document.getElementById('btn-approve');
     const backWrap = document.getElementById('cv-back-wrap');
@@ -2501,7 +2744,6 @@ function renderDash() {
 
 // ── EXPENSES ──────────────────────────────────────────────────────────
 const EXPENSE_COLS = 'id,date,vendor,description,amount,vat_type,vat_amount,receipt_type,created_at';
-const REDUCED_VAT = { NL:9, DE:7, IT:10, BE:6, FR:5.5, ES:10, PT:6, AT:10, IE:13.5, PL:8, SE:12, GB:5, CH:2.6 };
 let _exReceipt = null;
 
 function dbToExpense(r) {
@@ -2524,9 +2766,9 @@ function expenseVat(amount, type) {
 
 function initExpenses() {
   const sel = document.getElementById('ex-vat');
-  const std = stdVatRate(), red = REDUCED_VAT[S.settings.country];
+  const std = stdVatRate();
   const opts = [[`r:${std}`, t('exp_vstd').replace('{r}', std)]];
-  if (red) opts.push([`r:${red}`, t('exp_vstd').replace('{r}', red)]);
+  taxOf(S.settings.country).rates.filter(r => r > 0 && r !== std).forEach(r => opts.push([`r:${r}`, t('exp_vstd').replace('{r}', r)]));
   opts.push(['r:0', t('exp_v0')], ['rc_non_eu', t('exp_vrcout')], ['rc_eu', t('exp_vrceu')]);
   sel.innerHTML = '';
   opts.forEach(([v, label]) => { const o = document.createElement('option'); o.value = v; o.textContent = label; sel.appendChild(o); });
@@ -2687,8 +2929,10 @@ function renderBtwCard() {
   const exps = S.expenses.filter(x => inQuarter(x.date, f));
   const sum = (arr, fn) => arr.reduce((acc, x) => acc + fn(x), 0);
 
-  const std = stdVatRate(), red = REDUCED_VAT[S.settings.country];
-  const salesAt = test => { const g = invs.filter(i => test(parseFloat(i.vatRate) || 0));
+  const std = stdVatRate();
+  const domestic = invs.filter(i => i.kind !== 'rc_eu' && i.kind !== 'export');
+  const s3b = { base: sum(invs.filter(i => i.kind === 'rc_eu'), i => parseFloat(i.subtotal || i.total || 0)) };
+  const salesAt = test => { const g = domestic.filter(i => test(parseFloat(i.vatRate) || 0));
     return { base: sum(g, i => parseFloat(i.subtotal || i.total || 0)), vat: sum(g, i => parseFloat(i.vatAmount || 0)) }; };
   const s1a = salesAt(r => r === std), s1b = salesAt(r => r > 0 && r !== std), s1e = salesAt(r => r === 0);
   const rcOf = type => { const g = exps.filter(x => x.vatType === type); return { base: sum(g, x => x.amount), vat: sum(g, x => x.vatAmount) }; };
@@ -2707,8 +2951,9 @@ function renderBtwCard() {
       <td class="py-1.5 pr-2 font-mono text-gray-500">${code}</td><td class="py-1.5 pr-2 text-gray-400">${esc(name)}</td>
       <td class="py-1.5 pr-2 text-right text-gray-300">${base === null ? '' : esc(fmt(base))}</td><td class="py-1.5 text-right font-bold">${esc(fmt(vat))}</td></tr>`;
   let boxes = row('1a', `${t('btw_rev')} ${std}%`, s1a.base, s1a.vat);
-  if (s1b.base) boxes += row('1b', `${t('btw_rev')} ${red || ''}%`, s1b.base, s1b.vat);
+  if (s1b.base) boxes += row('1b', `${t('btw_rev')} ${t('exp_vstd').replace('{r}', '').replace(/\s+/g, ' ').trim()}`, s1b.base, s1b.vat);
   if (s1e.base) boxes += row('1e', `${t('btw_rev')} 0%`, s1e.base, 0);
+  if (s3b.base) boxes += row('3b', t('tr_rc'), s3b.base, 0);
   if (s4a.base) boxes += row('4a', t('exp_vrcout'), s4a.base, s4a.vat);
   if (s4b.base) boxes += row('4b', t('exp_vrceu'), s4b.base, s4b.vat);
   boxes += row('5b', t('btw_paid'), null, s5b);
@@ -2727,7 +2972,8 @@ function renderBtwCard() {
       </div>
     </div>
     ${isNL ? `<div class="${lbl} mb-1">${esc(t('btw_fill'))}</div>
-    <div class="overflow-x-auto"><table class="w-full text-xs">${boxes}</table></div>` : `
+    <div class="overflow-x-auto"><table class="w-full text-xs">${boxes}</table></div>
+    ${s3b.base ? `<div class="text-[11px] text-yellow-300 mt-2">${esc(t('btw_icp'))}</div>` : ''}` : `
     <div class="flex gap-6 text-sm">
       <div><div class="${lbl} mb-1">${esc(t('btw_vat'))}</div><div class="font-black">${esc(fmt(charged))}</div></div>
       <div><div class="${lbl} mb-1">${esc(t('btw_paid'))}</div><div class="font-black">${esc(fmt(paid))}</div></div>
@@ -2750,8 +2996,8 @@ function downloadTaxCalendar() {
     deadline = new Date(year, q * 3 + 4, 0);
   }
   const now = new Date();
-  let ib = new Date(now.getFullYear(), 4, 1);
-  if (now > ib) ib = new Date(now.getFullYear() + 1, 4, 1);
+  let ib = new Date(now.getFullYear(), 3, 30);
+  if (now > ib) ib = new Date(now.getFullYear() + 1, 3, 30);
   events.push({ date: ib, title: `${t('ics_ib')} ${ib.getFullYear() - 1}` });
 
   const stamp = now.toISOString().replace(/[-:]/g, '').replace(/\.\d+/, '');
@@ -2932,6 +3178,7 @@ async function saveSettings() {
     kleinunternehmer: S.settings.kleinunternehmer,
     autoentrepreneur: S.settings.autoentrepreneur,
     logo:             S.settings.logo || '',
+    options:          { ...(S.settings.options || {}), whOpt: document.getElementById('s-wh-opt').value || undefined },
     terms:            document.getElementById('s-terms').value.trim(),
     dueDays:          parseInt(document.getElementById('s-days').value)   || 30,
   };
@@ -2958,12 +3205,14 @@ async function saveSettings() {
       due_days:         S.settings.dueDays,
       lang:             S.lang,
       logo:             S.settings.logo || null,
+      options:          S.settings.options || {},
       updated_at:       new Date().toISOString()
     };
     let { error } = await _sb.from('settings').upsert(row);
     // Databases without the logo column: save everything else and say why the logo didn't stick.
-    if (error && /logo/.test(error.message || '')) {
+    if (error && /logo|options/.test(error.message || '')) {
       delete row.logo;
+      delete row.options;
       ({ error } = await _sb.from('settings').upsert(row));
       if (!error) { toast('⚠️', t('t_logo_db')); return; }
     }
@@ -3035,7 +3284,7 @@ function buildInvoicePDF(inv) {
     }
     doc.setFont('helvetica','bold'); doc.setFontSize(17); doc.setTextColor(...INK);
     doc.text(doc.splitTextToSize(sender, 140 - nameX)[0], nameX, 20);
-    small(docTypeLabel(code), R, 14, { align: 'right' });
+    small(docTypeLabel(inv), R, 14, { align: 'right' });
     doc.setFontSize(13); doc.setTextColor(...INK);
     doc.text(inv.id, R, 20.5, { align: 'right' });
     doc.setDrawColor(...RULE); doc.setLineWidth(0.3);
@@ -3055,8 +3304,9 @@ function buildInvoicePDF(inv) {
     doc.setFont('helvetica','bold'); doc.setFontSize(10.5); doc.setTextColor(...INK);
     doc.text(value || '-', x, y + 16.5);
   };
-  dateCol(t('pdf_date'), fmtDate(inv.issueDate), 116);
-  if (inv.dueDate) dateCol(t('pdf_due'), fmtDate(inv.dueDate), 154);
+  dateCol(t('pdf_date'), fmtDate(inv.issueDate), 96);
+  if (inv.dueDate) dateCol(t('pdf_due'), fmtDate(inv.dueDate), 128);
+  if (inv.serviceDate) dateCol(t('pdf_svc'), doc.splitTextToSize(inv.serviceDate, 30)[0], 160);
   y += 35;
 
   // From / To
@@ -3075,19 +3325,16 @@ function buildInvoicePDF(inv) {
     doc.text(a, M, yl); yl += a.length * 4.2;
   }
   if (S.settings.email) { doc.text(S.settings.email, M, yl); yl += 4.2; }
+  if (inv.clientAddress) {
+    const ca = doc.splitTextToSize(inv.clientAddress, 76);
+    doc.text(ca, 116, yr); yr += ca.length * 4.2;
+  }
+  if (inv.clientCountry && inv.clientCountry !== code && inv.clientCountry !== 'XX') { doc.text(regionName(inv.clientCountry), 116, yr); yr += 4.2; }
+  if (inv.clientVat) { doc.text(`${t('pdf_cvat')}: ${inv.clientVat}`, 116, yr); yr += 4.2; }
   if (inv.clientEmail) { doc.text(inv.clientEmail, 116, yr); yr += 4.2; }
   y = Math.max(yl, yr) + 7;
 
-  // Special tax regimes need a legal line on the invoice
-  const legalMap = {
-    kleinunternehmer: { it: 'Operazione effettuata ai sensi del §19 UStG. IVA non applicata.', en: 'Pursuant to §19 UStG (German small business regulation), no VAT charged.', de: 'Gemäß §19 UStG wird keine Umsatzsteuer berechnet.' },
-    autoentrepreneur: { it: 'TVA non applicable, art. 293 B du CGI.', en: 'TVA not applicable, art. 293 B CGI (French auto-entrepreneur regime).' },
-    ritenuta: { it: 'Compenso soggetto a ritenuta d\'acconto del 20% ai sensi dell\'art. 25 DPR 600/73.', en: 'Subject to 20% withholding tax (Italian ritenuta d\'acconto, art. 25 DPR 600/73).' }
-  };
-  const legal = [];
-  if (S.settings.kleinunternehmer) legal.push(legalMap.kleinunternehmer[S.lang] || legalMap.kleinunternehmer.en);
-  if (S.settings.autoentrepreneur) legal.push(legalMap.autoentrepreneur[S.lang] || legalMap.autoentrepreneur.en);
-  if (S.settings.ritenuta)         legal.push(legalMap.ritenuta[S.lang] || legalMap.ritenuta.en);
+  const legal = inv.legal || legacyLegal();
 
   // Line items
   const X_QTY = 136, X_RATE = 162;
@@ -3136,7 +3383,7 @@ function buildInvoicePDF(inv) {
   if (hasTax) {
     totalRow(t('pdf_subtotal'), fmt(inv.subtotal || inv.total));
     if (parseFloat(inv.vatAmount) > 0) totalRow(`${inv.taxName || ctry.taxName} ${inv.vatRate}%`, fmt(inv.vatAmount));
-    if (parseFloat(inv.ritenuteAmount) > 0) totalRow(`${t('pdf_ritenuta')} 20%`, `- ${fmt(inv.ritenuteAmount)}`, [190,60,60]);
+    if (parseFloat(inv.ritenuteAmount) > 0) totalRow(inv.whLabel || `${t('pdf_ritenuta')} 20%`, `- ${fmt(inv.ritenuteAmount)}`, [190,60,60]);
   }
   doc.setDrawColor(...INK); doc.setLineWidth(0.4); doc.line(TL, y - 1.5, R, y - 1.5);
   y += 5;
@@ -3226,8 +3473,13 @@ function exportUBL(id) {
   const cur = inv.currency || S.settings.currency || 'EUR';
   const code = S.settings.country || 'IT';
   const ctry = COUNTRIES[code] || COUNTRIES.IT;
-  const vatCode = S.settings.kleinunternehmer ? 'E' : (parseFloat(inv.vatRate||0) === 0 ? 'Z' : 'S');
-  const vatPct  = S.settings.kleinunternehmer ? 0 : parseFloat(inv.vatRate||0);
+  // EN 16931 tax categories: S standard, AE reverse charge, G export outside the EU, E exempt, O not subject
+  const kind    = inv.kind || (S.settings.kleinunternehmer ? 'small' : (parseFloat(inv.vatRate||0) > 0 ? 'standard' : 'none'));
+  const vatCode = { standard: parseFloat(inv.vatRate||0) > 0 ? 'S' : 'Z', rc_eu: 'AE', export: 'G', small: 'E', none: 'O' }[kind] || 'S';
+  const vatPct  = vatCode === 'S' ? parseFloat(inv.vatRate||0) : 0;
+  const reason  = { AE: 'Reverse charge', G: 'Export outside the EU', E: (inv.legal && inv.legal[0]) || 'Exempt', O: 'Not subject to VAT' }[vatCode];
+  const lineCat = `<cbc:ID>${vatCode}</cbc:ID>${vatCode === 'O' ? '' : `\n        <cbc:Percent>${vatPct}</cbc:Percent>`}`;
+  const taxCat  = `<cbc:ID>${vatCode}</cbc:ID>${vatCode === 'O' ? '' : `\n        <cbc:Percent>${vatPct}</cbc:Percent>`}${reason ? `\n        <cbc:TaxExemptionReason>${esc(reason)}</cbc:TaxExemptionReason>` : ''}`;
   const subtotal = parseFloat(inv.subtotal || inv.total || 0).toFixed(2);
   const vatAmt  = parseFloat(inv.vatAmount || 0).toFixed(2);
   const total   = parseFloat(inv.total || 0).toFixed(2);
@@ -3242,9 +3494,8 @@ function exportUBL(id) {
       <cbc:Description>${esc(it.desc||'')}</cbc:Description>
       <cbc:Name>${esc((it.desc||'').substring(0,40))}</cbc:Name>
       <cac:ClassifiedTaxCategory>
-        <cbc:ID>${vatCode}</cbc:ID>
-        <cbc:Percent>${vatPct}</cbc:Percent>
-        <cac:TaxScheme><cbc:ID>${ctry.taxName||'VAT'}</cbc:ID></cac:TaxScheme>
+        ${lineCat}
+        <cac:TaxScheme><cbc:ID>VAT</cbc:ID></cac:TaxScheme>
       </cac:ClassifiedTaxCategory>
     </cac:Item>
     <cac:Price>
@@ -3266,14 +3517,16 @@ function exportUBL(id) {
   <cbc:DocumentCurrencyCode>${cur}</cbc:DocumentCurrencyCode>
   <cac:AccountingSupplierParty>
     <cac:Party>
-      <cac:PartyName><cbc:Name>${esc(S.settings.name||S.settings.email||'')}</cbc:Name></cac:PartyName>${S.settings.address ? `\n      <cac:PostalAddress><cbc:StreetName>${esc(S.settings.address)}</cbc:StreetName><cac:Country><cbc:IdentificationCode>${code}</cbc:IdentificationCode></cac:Country></cac:PostalAddress>` : ''}${S.settings.vat ? `\n      <cac:PartyTaxScheme><cbc:CompanyID>${esc(S.settings.vat)}</cbc:CompanyID><cac:TaxScheme><cbc:ID>${ctry.taxName||'VAT'}</cbc:ID></cac:TaxScheme></cac:PartyTaxScheme>` : ''}
+      <cac:PartyName><cbc:Name>${esc(S.settings.name||S.settings.email||'')}</cbc:Name></cac:PartyName>${S.settings.address ? `\n      <cac:PostalAddress><cbc:StreetName>${esc(S.settings.address)}</cbc:StreetName><cac:Country><cbc:IdentificationCode>${code}</cbc:IdentificationCode></cac:Country></cac:PostalAddress>` : ''}${S.settings.vat ? `\n      <cac:PartyTaxScheme><cbc:CompanyID>${esc(S.settings.vat)}</cbc:CompanyID><cac:TaxScheme><cbc:ID>VAT</cbc:ID></cac:TaxScheme></cac:PartyTaxScheme>` : ''}
       <cac:PartyLegalEntity><cbc:RegistrationName>${esc(S.settings.name||'')}</cbc:RegistrationName></cac:PartyLegalEntity>
       <cac:Contact><cbc:ElectronicMail>${esc(S.settings.email||'')}</cbc:ElectronicMail></cac:Contact>
     </cac:Party>
   </cac:AccountingSupplierParty>
   <cac:AccountingCustomerParty>
     <cac:Party>
-      <cac:PartyName><cbc:Name>${esc(inv.client||'')}</cbc:Name></cac:PartyName>${inv.clientEmail ? `\n      <cac:Contact><cbc:ElectronicMail>${esc(inv.clientEmail)}</cbc:ElectronicMail></cac:Contact>` : ''}
+      <cac:PartyName><cbc:Name>${esc(inv.client||'')}</cbc:Name></cac:PartyName>
+      <cac:PostalAddress>${inv.clientAddress ? `<cbc:StreetName>${esc(inv.clientAddress.split('\n')[0])}</cbc:StreetName>` : ''}<cac:Country><cbc:IdentificationCode>${esc(inv.clientCountry && inv.clientCountry !== 'XX' ? inv.clientCountry : code)}</cbc:IdentificationCode></cac:Country></cac:PostalAddress>${inv.clientVat ? `\n      <cac:PartyTaxScheme><cbc:CompanyID>${esc(inv.clientVat)}</cbc:CompanyID><cac:TaxScheme><cbc:ID>VAT</cbc:ID></cac:TaxScheme></cac:PartyTaxScheme>` : ''}
+      <cac:PartyLegalEntity><cbc:RegistrationName>${esc(inv.client||'')}</cbc:RegistrationName></cac:PartyLegalEntity>${inv.clientEmail ? `\n      <cac:Contact><cbc:ElectronicMail>${esc(inv.clientEmail)}</cbc:ElectronicMail></cac:Contact>` : ''}
     </cac:Party>
   </cac:AccountingCustomerParty>${S.settings.iban ? `\n  <cac:PaymentMeans>\n    <cbc:PaymentMeansCode>30</cbc:PaymentMeansCode>\n    <cac:PayeeFinancialAccount><cbc:ID>${esc(S.settings.iban)}</cbc:ID></cac:PayeeFinancialAccount>\n  </cac:PaymentMeans>` : ''}${inv.notes ? `\n  <cac:PaymentTerms><cbc:Note>${esc(inv.notes)}</cbc:Note></cac:PaymentTerms>` : ''}
   <cac:TaxTotal>
@@ -3282,9 +3535,8 @@ function exportUBL(id) {
       <cbc:TaxableAmount currencyID="${cur}">${subtotal}</cbc:TaxableAmount>
       <cbc:TaxAmount currencyID="${cur}">${vatAmt}</cbc:TaxAmount>
       <cac:TaxCategory>
-        <cbc:ID>${vatCode}</cbc:ID>
-        <cbc:Percent>${vatPct}</cbc:Percent>
-        <cac:TaxScheme><cbc:ID>${ctry.taxName||'VAT'}</cbc:ID></cac:TaxScheme>
+        ${taxCat}
+        <cac:TaxScheme><cbc:ID>VAT</cbc:ID></cac:TaxScheme>
       </cac:TaxCategory>
     </cac:TaxSubtotal>
   </cac:TaxTotal>
@@ -3403,6 +3655,11 @@ function duplicateInv(id) {
     itemIdx = 0;
     (inv.items || []).forEach(it => it.discount ? addDiscount(it.desc, Math.abs(it.amount)) : addItem(it.desc, it.hours, it.rate));
     if (inv.docLang) document.getElementById('in-lang').value = inv.docLang;
+    fillClientCountries(inv.clientCountry);
+    if (inv.clientType) document.getElementById('in-ctype').value = inv.clientType;
+    document.getElementById('in-cvat').value  = inv.clientVat || '';
+    document.getElementById('in-caddr').value = inv.clientAddress || '';
+    onClientTypeChange();
     if (!inv.items || !inv.items.length) addItem();
     document.getElementById('in-notes').value = inv.notes || S.settings.terms || '';
     recalc();
@@ -3494,11 +3751,13 @@ function savedClients() {
   const seen = new Map();
   (S.invoices || []).forEach(inv => {
     const name = (inv.client || '').trim();
-    if (!name) return;
-    if (!seen.has(name)) seen.set(name, inv.clientEmail || '');
+    if (!name || seen.has(name)) return;
+    seen.set(name, { name, email: inv.clientEmail || '', type: inv.clientType, country: inv.clientCountry,
+      vat: inv.clientVat || '', address: inv.clientAddress || '' });
   });
-  return Array.from(seen.entries()).map(([name, email]) => ({ name, email }));
+  return Array.from(seen.values());
 }
+let _acMatches = [];
 
 function clientAC(q) {
   const ac = document.getElementById('client-ac');
@@ -3510,8 +3769,9 @@ function clientAC(q) {
 
   if (!matches.length) { ac.classList.add('hidden'); return; }
 
-  ac.innerHTML = matches.slice(0, 6).map(c => `
-    <button type="button" onclick="pickClient(${JSON.stringify(c.name)},${JSON.stringify(c.email)})"
+  _acMatches = matches.slice(0, 6);
+  ac.innerHTML = _acMatches.map((c, i) => `
+    <button type="button" onclick="pickClient(${i})"
       class="w-full text-left px-4 py-3 hover:bg-gray-900 transition border-b border-gray-900 last:border-0 flex items-center justify-between gap-3">
       <span class="font-bold text-white text-sm">${esc(c.name)}</span>
       <span class="text-[11px] text-gray-500 truncate">${esc(c.email)}</span>
@@ -3519,9 +3779,16 @@ function clientAC(q) {
   ac.classList.remove('hidden');
 }
 
-function pickClient(name, email) {
-  document.getElementById('in-client').value = name;
-  document.getElementById('in-cemail').value = email;
+function pickClient(i) {
+  const c = _acMatches[i];
+  if (!c) return;
+  document.getElementById('in-client').value = c.name;
+  document.getElementById('in-cemail').value = c.email;
+  if (c.country) fillClientCountries(c.country);
+  if (c.type) document.getElementById('in-ctype').value = c.type;
+  document.getElementById('in-cvat').value  = c.vat;
+  document.getElementById('in-caddr').value = c.address;
+  onClientTypeChange();
   closeClientAC();
 }
 
