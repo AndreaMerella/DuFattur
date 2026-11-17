@@ -4,6 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DuFattur | The Freelance OS</title>
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="theme-color" content="#0a0a0a">
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="DuFattur">
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230a0a0a'/%3E%3Ctext x='32' y='43' font-family='Arial,Helvetica,sans-serif' font-weight='900' font-size='30' text-anchor='middle' fill='%23ffffff'%3ED%3Ctspan fill='%233b82f6'%3EF%3C/tspan%3E%3C/text%3E%3C/svg%3E">
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;700;800;900&display=swap" rel="stylesheet">
@@ -167,6 +174,29 @@
     </style>
 </head>
 <body class="h-screen flex overflow-hidden">
+<div id="offline-bar" hidden style="position:fixed;left:0;right:0;bottom:0;z-index:60;background:#7c2d12;color:#fff;font:600 13px/1.4 Inter,system-ui,sans-serif;text-align:center;padding:10px 16px;"></div>
+<script>
+  (function () {
+    var MSG = { it: 'Sei offline: le modifiche non possono essere salvate.', en: "You're offline: changes can't be saved.",
+                nl: 'Je bent offline: wijzigingen kunnen niet worden opgeslagen.', de: 'Du bist offline: Änderungen können nicht gespeichert werden.' };
+    function lang() {
+      var l = '';
+      try { l = localStorage.getItem('df_lang') || ''; } catch (e) {}
+      l = (l || navigator.language || 'en').slice(0, 2);
+      return MSG[l] ? l : 'en';
+    }
+    function show(off) { var bar = document.getElementById('offline-bar'); bar.textContent = MSG[lang()]; bar.hidden = !off; }
+    // navigator.onLine says "online" on Wi-Fi without internet, so confirm with a request that skips every cache
+    function sync() {
+      if (!navigator.onLine) return show(true);
+      fetch('manifest.webmanifest?ping=' + Date.now(), { cache: 'no-store' })
+        .then(function (r) { show(!r.ok); }).catch(function () { show(true); });
+    }
+    window.addEventListener('online', sync); window.addEventListener('offline', sync); sync();
+    if ('serviceWorker' in navigator) window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () {}); });
+    window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); window._installPrompt = e; var b = document.getElementById('btn-install'); if (b) b.hidden = false; });
+  })();
+</script>
 
 <!-- ═══════════════════ SIDEBAR ═══════════════════ -->
 <aside id="sidebar" class="w-60 bg-panel border-r border-gray-900 flex flex-col py-6 px-3 z-10 hidden-view" style="background:#0e0e0e;">
@@ -1068,6 +1098,13 @@ grant execute on function public.keepalive() to anon;</pre>
                 </div>
             </div>
 
+            <!-- Install as an app -->
+            <div class="card" style="background:#0e0e0e;border-color:#1e1e1e;">
+                <h3 class="text-[10px] font-black uppercase tracking-widest text-gray-500 mb-2" data-i18n="set_install">Install the app</h3>
+                <p class="text-xs text-gray-500 mb-3" id="install-hint"></p>
+                <button type="button" id="btn-install" hidden onclick="installApp()" class="btn-y text-xs py-2 px-4" data-i18n="btn_install">Install DuFattur</button>
+            </div>
+
             <!-- Theme / accent color -->
             <div class="card" style="background:#0e0e0e;border-color:#1e1e1e;">
                 <h3 class="text-[10px] font-black uppercase tracking-widest text-gray-500 mb-4" data-i18n="set_theme">Colore Tema</h3>
@@ -1106,6 +1143,7 @@ const L = {
     lbl_ctype:'Tipo di cliente', opt_business:'Azienda / professionista', opt_private:'Privato', lbl_ccountry:'Paese del cliente', lbl_cvat:'Partita IVA del cliente', lbl_caddr:'Indirizzo del cliente', lbl_svc:'Data o periodo della prestazione', ph_svc:'es. novembre 2026', other_country:'Altro paese (fuori UE)', pdf_svc:'PRESTAZIONE', pdf_cvat:'P.IVA', tr_std:'{tax} {r}% sul totale.', tr_rc:'Reverse charge: 0% IVA, il cliente versa l\'IVA nel suo paese.', tr_export:'Cliente fuori dall\'UE: nessuna IVA.', tr_small:'Regime per piccole imprese: nessuna IVA.', tr_none:'Nessuna IVA applicata.', tr_wh:'{label} trattenuta dal totale.', t_need_vat:'Per il reverse charge serve la partita IVA del cliente.', w_it:'Le fatture italiane valgono solo se inviate tramite SDI: questo PDF è una proforma.', w_pt:'In Portogallo vale solo una fattura da software certificato o dal Portal das Finanças: questo PDF è una proforma.', w_pl:'Dal 2026 le fatture polacche tra aziende vanno emesse in KSeF: questo PDF è una proforma.', w_be:'Dal 2026 le fatture tra aziende belghe devono essere e-fatture Peppol: questo PDF è una proforma.', w_fr:'Dal 1 settembre 2027 le fatture tra aziende francesi passano da una piattaforma approvata: questo PDF è una proforma.', w_de:'Dal 2028 le fatture tra aziende tedesche devono essere e-fatture (XRechnung/ZUGFeRD): questo PDF è una proforma.', w_es:'Dal luglio 2027 (forse rinviato al 2028) le fatture spagnole richiedono un software conforme a Verifactu.', note_export:'IVA non applicabile: prestazione fuori dall\'UE (art. 44 Direttiva 2006/112/CE).', note_rc_nonEU:'Reverse charge: l\'imposta è dovuta dal destinatario.', set_small_sub:'Nessuna IVA sulle fatture, con la dicitura di legge.', set_wh_sub:'Solo per clienti aziende nel tuo paese.', wh_waiver:'Esenzione (art. 101.º-B CIRS)', btw_icp:'Presenta anche l\'opgaaf ICP.',
     vies_btn:'Verifica', vies_busy:'Verifica in VIES…', vies_ok:'Valida in VIES', vies_bad:'Non valida in VIES: controlla il numero con il cliente.', vies_down:'VIES non risponde ora: riprova più tardi.', vies_setup:'La verifica VIES non è ancora attiva (funzione da pubblicare in Supabase).', vies_fmt:'Non sembra una partita IVA UE.',
     ubl_gap_seller:'E-fattura scaricata. Per Peppol manca il tuo identificativo (KVK o partita IVA nelle impostazioni).', ubl_gap_buyer:'E-fattura scaricata. Per Peppol serve la partita IVA del cliente.', lbl_cref:'Riferimento del cliente / n. ordine (facoltativo)', set_phone:'Telefono',
+    set_install:'Installa l\'app', btn_install:'Installa DuFattur', install_ios:'Su iPhone: tocca Condividi, poi «Aggiungi alla schermata Home».', install_other:'Aggiungi DuFattur alla schermata Home: si apre a schermo intero, come un\'app.', install_done:'DuFattur è installata su questo dispositivo.',
     nav_dash:'Dashboard', nav_inv:'Nuovo Proforma', nav_an:'Analisi', nav_set:'Impostazioni',
     dash_h1:'Dashboard Operativa', dash_sub:'Monitora ore, incassi e stato dei proforma.',
     kpi_tot:'Totale Proforma', kpi_pend:'In Attesa', kpi_appr:'Da Incassare', kpi_tax:'Fondo Tasse',
@@ -1182,6 +1220,7 @@ const L = {
     lbl_ctype:'Client type', opt_business:'Business', opt_private:'Private person', lbl_ccountry:'Client country', lbl_cvat:'Client VAT number', lbl_caddr:'Client address', lbl_svc:'Service date or period', ph_svc:'e.g. November 2026', other_country:'Other country (outside the EU)', pdf_svc:'SERVICE DATE', pdf_cvat:'VAT no.', tr_std:'{tax} {r}% on the total.', tr_rc:'Reverse charge: 0% VAT, your client accounts for VAT in their country.', tr_export:'Client outside the EU: no VAT.', tr_small:'Small business scheme: no VAT.', tr_none:'No VAT applied.', tr_wh:'{label} deducted from the total.', t_need_vat:'Reverse charge needs your client\'s VAT number.', w_it:'Italian invoices are only valid when sent through SDI: this PDF is a proforma.', w_pt:'In Portugal only invoices from certified software or the Portal das Finanças are valid: this PDF is a proforma.', w_pl:'Since 2026, Polish business-to-business invoices must be issued in KSeF: this PDF is a proforma.', w_be:'Since 2026, invoices between Belgian businesses must be Peppol e-invoices: this PDF is a proforma.', w_fr:'From 1 September 2027, invoices between French businesses go through an approved platform: this PDF is a proforma.', w_de:'From 2028, invoices between German businesses must be e-invoices (XRechnung/ZUGFeRD): this PDF is a proforma.', w_es:'From July 2027 (possibly postponed to 2028), Spanish invoices need Verifactu-compliant software.', note_export:'VAT not applicable: place of supply outside the EU (art. 44 Directive 2006/112/EC).', note_rc_nonEU:'Reverse charge: VAT to be accounted for by the recipient.', set_small_sub:'No VAT on invoices, with the legal wording.', set_wh_sub:'Only for business clients in your country.', wh_waiver:'Waiver (art. 101.º-B CIRS)', btw_icp:'Also file the EU sales listing (opgaaf ICP).',
     vies_btn:'Check', vies_busy:'Checking VIES…', vies_ok:'Valid in VIES', vies_bad:'Not valid in VIES: check the number with your client.', vies_down:'VIES isn\'t responding right now: try again later.', vies_setup:'The VIES check isn\'t set up yet (function to deploy in Supabase).', vies_fmt:'This doesn\'t look like an EU VAT number.',
     ubl_gap_seller:'E-invoice downloaded. For Peppol, add your KVK or VAT number in Settings.', ubl_gap_buyer:'E-invoice downloaded. For Peppol, your client\'s VAT number is needed.', lbl_cref:'Client\'s reference / PO number (optional)', set_phone:'Phone',
+    set_install:'Install the app', btn_install:'Install DuFattur', install_ios:'On iPhone: tap Share, then "Add to Home Screen".', install_other:'Add DuFattur to your home screen: it opens full-screen, like an app.', install_done:'DuFattur is installed on this device.',
     nav_dash:'Dashboard', nav_inv:'New Invoice', nav_an:'Analytics', nav_set:'Settings',
     dash_h1:'Operations Dashboard', dash_sub:'Track hours, revenue, and invoice status.',
     kpi_tot:'Total Invoices', kpi_pend:'Pending', kpi_appr:'Outstanding', kpi_tax:'Tax Vault',
@@ -1258,6 +1297,7 @@ const L = {
     lbl_ctype:'Soort klant', opt_business:'Bedrijf / zzp\'er', opt_private:'Particulier', lbl_ccountry:'Land van de klant', lbl_cvat:'Btw-nummer van de klant', lbl_caddr:'Adres van de klant', lbl_svc:'Leverdatum of periode', ph_svc:'bijv. november 2026', other_country:'Ander land (buiten de EU)', pdf_svc:'LEVERDATUM', pdf_cvat:'Btw-nr.', tr_std:'{tax} {r}% over het totaal.', tr_rc:'Btw verlegd: 0% btw, je klant draagt de btw af in eigen land.', tr_export:'Klant buiten de EU: geen btw.', tr_small:'Kleineondernemersregeling: geen btw.', tr_none:'Geen btw berekend.', tr_wh:'{label} ingehouden op het totaal.', t_need_vat:'Voor btw verlegd is het btw-nummer van je klant nodig.', w_it:'Italiaanse facturen zijn alleen geldig via SDI: deze pdf is een proforma.', w_pt:'In Portugal is alleen een factuur uit gecertificeerde software of het Portal das Finanças geldig: deze pdf is een proforma.', w_pl:'Sinds 2026 moeten Poolse facturen tussen bedrijven via KSeF: deze pdf is een proforma.', w_be:'Sinds 2026 moeten facturen tussen Belgische bedrijven Peppol-e-facturen zijn: deze pdf is een proforma.', w_fr:'Vanaf 1 september 2027 lopen facturen tussen Franse bedrijven via een erkend platform: deze pdf is een proforma.', w_de:'Vanaf 2028 moeten facturen tussen Duitse bedrijven e-facturen zijn (XRechnung/ZUGFeRD): deze pdf is een proforma.', w_es:'Vanaf juli 2027 (mogelijk uitgesteld tot 2028) vragen Spaanse facturen om Verifactu-software.', note_export:'Btw niet van toepassing: dienst buiten de EU (art. 44 Richtlijn 2006/112/EG).', note_rc_nonEU:'Verlegd: de btw wordt afgedragen door de afnemer.', set_small_sub:'Geen btw op facturen, met de verplichte vermelding.', set_wh_sub:'Alleen voor zakelijke klanten in je eigen land.', wh_waiver:'Vrijstelling (art. 101.º-B CIRS)', btw_icp:'Dien ook de opgaaf ICP in.',
     vies_btn:'Controleer', vies_busy:'VIES controleren…', vies_ok:'Geldig in VIES', vies_bad:'Niet geldig in VIES: controleer het nummer met je klant.', vies_down:'VIES reageert nu niet: probeer het later opnieuw.', vies_setup:'De VIES-controle is nog niet actief (functie publiceren in Supabase).', vies_fmt:'Dit lijkt geen EU-btw-nummer.',
     ubl_gap_seller:'E-factuur gedownload. Voor Peppol: vul je KVK- of btw-nummer in bij Instellingen.', ubl_gap_buyer:'E-factuur gedownload. Voor Peppol is het btw-nummer van je klant nodig.', lbl_cref:'Referentie van de klant / ordernummer (optioneel)', set_phone:'Telefoon',
+    set_install:'App installeren', btn_install:'DuFattur installeren', install_ios:'Op iPhone: tik op Deel en dan op "Zet op beginscherm".', install_other:'Zet DuFattur op je beginscherm: het opent schermvullend, als een app.', install_done:'DuFattur is geïnstalleerd op dit apparaat.',
     nav_dash:'Dashboard', nav_inv:'Nieuwe Factuur', nav_an:'Analyse', nav_set:'Instellingen',
     dash_h1:'Operationeel Dashboard', dash_sub:'Volg uren, omzet en factuurstatus.',
     kpi_tot:'Totaal Facturen', kpi_pend:'In Behandeling', kpi_appr:'Openstaand', kpi_tax:'Belastingreserve',
@@ -1334,6 +1374,7 @@ const L = {
     lbl_ctype:'Kundenart', opt_business:'Unternehmen', opt_private:'Privatperson', lbl_ccountry:'Land des Kunden', lbl_cvat:'USt-IdNr. des Kunden', lbl_caddr:'Adresse des Kunden', lbl_svc:'Leistungsdatum oder -zeitraum', ph_svc:'z.B. November 2026', other_country:'Anderes Land (außerhalb der EU)', pdf_svc:'LEISTUNGSDATUM', pdf_cvat:'USt-IdNr.', tr_std:'{tax} {r}% auf den Betrag.', tr_rc:'Reverse Charge: 0% USt., dein Kunde führt die Steuer in seinem Land ab.', tr_export:'Kunde außerhalb der EU: keine USt.', tr_small:'Kleinunternehmerregelung: keine USt.', tr_none:'Keine USt. berechnet.', tr_wh:'{label} wird vom Betrag einbehalten.', t_need_vat:'Für Reverse Charge wird die USt-IdNr. des Kunden benötigt.', w_it:'Italienische Rechnungen gelten nur über SDI: dieses PDF ist eine Proforma.', w_pt:'In Portugal gilt nur eine Rechnung aus zertifizierter Software oder dem Portal das Finanças: dieses PDF ist eine Proforma.', w_pl:'Seit 2026 müssen polnische B2B-Rechnungen über KSeF laufen: dieses PDF ist eine Proforma.', w_be:'Seit 2026 müssen Rechnungen zwischen belgischen Unternehmen Peppol-E-Rechnungen sein: dieses PDF ist eine Proforma.', w_fr:'Ab 1. September 2027 laufen Rechnungen zwischen französischen Unternehmen über eine zugelassene Plattform: dieses PDF ist eine Proforma.', w_de:'Ab 2028 müssen Rechnungen zwischen deutschen Unternehmen E-Rechnungen sein (XRechnung/ZUGFeRD): dieses PDF ist eine Proforma.', w_es:'Ab Juli 2027 (evtl. verschoben auf 2028) brauchen spanische Rechnungen Verifactu-konforme Software.', note_export:'Nicht steuerbar: Leistungsort außerhalb der EU (Art. 44 Richtlinie 2006/112/EG).', note_rc_nonEU:'Reverse Charge: Steuerschuldnerschaft des Leistungsempfängers.', set_small_sub:'Keine USt. auf Rechnungen, mit Pflichthinweis.', set_wh_sub:'Nur bei Geschäftskunden im eigenen Land.', wh_waiver:'Befreiung (art. 101.º-B CIRS)', btw_icp:'Auch die Zusammenfassende Meldung (opgaaf ICP) abgeben.',
     vies_btn:'Prüfen', vies_busy:'VIES wird geprüft…', vies_ok:'Gültig in VIES', vies_bad:'Nicht gültig in VIES: Nummer mit dem Kunden prüfen.', vies_down:'VIES antwortet gerade nicht: später erneut versuchen.', vies_setup:'Die VIES-Prüfung ist noch nicht aktiv (Funktion in Supabase veröffentlichen).', vies_fmt:'Das sieht nicht wie eine EU-USt-IdNr. aus.',
     ubl_gap_seller:'E-Rechnung heruntergeladen. Für Peppol: KVK- oder USt-IdNr. in den Einstellungen eintragen.', ubl_gap_buyer:'E-Rechnung heruntergeladen. Für Peppol wird die USt-IdNr. des Kunden benötigt.', lbl_cref:'Referenz des Kunden / Bestellnummer (optional)', set_phone:'Telefon',
+    set_install:'App installieren', btn_install:'DuFattur installieren', install_ios:'Auf dem iPhone: Teilen tippen, dann „Zum Home-Bildschirm“.', install_other:'DuFattur zum Home-Bildschirm hinzufügen: öffnet sich im Vollbild, wie eine App.', install_done:'DuFattur ist auf diesem Gerät installiert.',
     nav_dash:'Dashboard', nav_inv:'Neue Rechnung', nav_an:'Analyse', nav_set:'Einstellungen',
     dash_h1:'Betriebsdashboard', dash_sub:'Stunden, Umsatz und Rechnungsstatus verfolgen.',
     kpi_tot:'Rechnungen Gesamt', kpi_pend:'Ausstehend', kpi_appr:'Offene Posten', kpi_tax:'Steuerrücklage',
@@ -1764,6 +1805,7 @@ function applyTr() {
   });
   document.querySelectorAll('[data-phi]').forEach(el => el.placeholder = t(el.dataset.phi));
   document.getElementById('html-root').lang = S.lang;
+  try { localStorage.setItem('df_lang', S.lang); } catch (_) {}
   const btn = document.getElementById('btn-timer');
   if (btn) btn.textContent = S.timer.on ? t('timer_stop') : t('timer_start');
   ['f_all','f_pend','f_appr','f_paid','f_over'].forEach((k,i) => {
@@ -3203,6 +3245,7 @@ function loadSetForm() {
   try { activeTheme = localStorage.getItem('df_theme') || DEFAULT_THEME; } catch(_) {}
   renderThemeSwatches(activeTheme);
   renderLogoPreview();
+  renderInstallCard();
   document.getElementById('s-country').value  = S.settings.country     || 'IT';
   document.getElementById('s-name').value     = S.settings.name        || '';
   document.getElementById('s-phone').value    = (S.settings.options || {}).phone || '';
@@ -3723,6 +3766,25 @@ function exportUBL(id) {
   document.body.removeChild(a); URL.revokeObjectURL(url);
   const gaps = peppolGaps(inv);
   toast(gaps.length ? '⚠️' : '📑', gaps.length ? gaps.join(' ') : t('t_ubl'));
+}
+
+// ── INSTALL (PWA) ─────────────────────────────────────────────────────
+function renderInstallCard() {
+  const hint = document.getElementById('install-hint');
+  if (!hint) return;
+  const standalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+  const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  hint.textContent = standalone ? t('install_done') : (ios ? t('install_ios') : t('install_other'));
+  document.getElementById('btn-install').hidden = standalone || !window._installPrompt;
+}
+
+async function installApp() {
+  const p = window._installPrompt;
+  if (!p) return;
+  p.prompt();
+  await p.userChoice;
+  window._installPrompt = null;
+  renderInstallCard();
 }
 
 // ── LOGO ──────────────────────────────────────────────────────────────
