@@ -589,6 +589,10 @@ grant execute on function public.keepalive() to anon;</pre>
                             </div>
                             <div id="in-vies" class="text-[11px] mt-1.5 min-h-[1rem]"></div>
                         </div>
+                        <div id="in-cref-wrap" class="sm:col-span-2">
+                            <label class="block text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-2" data-i18n="lbl_cref">Client's reference / PO number (optional)</label>
+                            <input type="text" id="in-cref" class="ifield" autocomplete="off">
+                        </div>
                         <div class="sm:col-span-2">
                             <label class="block text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-2" data-i18n="lbl_caddr">Client address</label>
                             <textarea id="in-caddr" rows="2" class="ifield resize-none" placeholder="Via Roma 1&#10;10022 Carmagnola (TO)"></textarea>
@@ -939,6 +943,10 @@ grant execute on function public.keepalive() to anon;</pre>
                         <input type="email" id="s-email" class="ifield" placeholder="you@email.com">
                     </div>
                     <div>
+                        <label class="block text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-2" data-i18n="set_phone">Phone</label>
+                        <input type="tel" id="s-phone" class="ifield" placeholder="+31 6 12345678">
+                    </div>
+                    <div>
                         <label id="s-vat-label" class="block text-[10px] text-gray-500 font-bold uppercase tracking-widest mb-2">P.IVA</label>
                         <input type="text" id="s-vat" class="ifield" placeholder="IT12345678901">
                     </div>
@@ -1097,6 +1105,7 @@ const L = {
     nav_exp:'Spese', exp_sub:'Ricevute e IVA da recuperare.', exp_new:'Nuova spesa', exp_date:'Data', exp_vendor:'Fornitore', exp_desc:'Descrizione', exp_amount:'Importo pagato', exp_vat:'IVA', exp_vstd:'{r}% IVA inclusa', exp_v0:'Senza IVA / 0%', exp_vrcout:'Reverse charge: fornitore fuori UE', exp_vrceu:'Reverse charge: fornitore in altro paese UE', exp_rc_hint:'Con il reverse charge non paghi IVA al fornitore: la dichiari e la detrai subito, quindi il saldo è zero.', exp_receipt:'Ricevuta (foto o PDF)', exp_attach:'Allega ricevuta', exp_save:'SALVA SPESA', exp_vat_back:'IVA da recuperare', exp_spent:'speso', exp_empty:'Nessuna spesa ancora.', exp_c_del:'Eliminare questa spesa?', exp_rc_tag:'Reverse charge', t_exp_saved:'Spesa salvata!', t_exp_del:'Spesa eliminata.', t_exp_warn:'Inserisci data, fornitore e importo.', t_rcpt_big:'File troppo grande (max 1,5 MB per i PDF, 10 MB per le foto).', exp_db:'Esegui l\'aggiornamento SQL del database per attivare le spese.', btw_paid:'IVA pagata (detraibile)', btw_pay:'Da versare', btw_back:'Da ricevere', btw_fill:'Valori per la dichiarazione',
     lbl_ctype:'Tipo di cliente', opt_business:'Azienda / professionista', opt_private:'Privato', lbl_ccountry:'Paese del cliente', lbl_cvat:'Partita IVA del cliente', lbl_caddr:'Indirizzo del cliente', lbl_svc:'Data o periodo della prestazione', ph_svc:'es. novembre 2026', other_country:'Altro paese (fuori UE)', pdf_svc:'PRESTAZIONE', pdf_cvat:'P.IVA', tr_std:'{tax} {r}% sul totale.', tr_rc:'Reverse charge: 0% IVA, il cliente versa l\'IVA nel suo paese.', tr_export:'Cliente fuori dall\'UE: nessuna IVA.', tr_small:'Regime per piccole imprese: nessuna IVA.', tr_none:'Nessuna IVA applicata.', tr_wh:'{label} trattenuta dal totale.', t_need_vat:'Per il reverse charge serve la partita IVA del cliente.', w_it:'Le fatture italiane valgono solo se inviate tramite SDI: questo PDF è una proforma.', w_pt:'In Portogallo vale solo una fattura da software certificato o dal Portal das Finanças: questo PDF è una proforma.', w_pl:'Dal 2026 le fatture polacche tra aziende vanno emesse in KSeF: questo PDF è una proforma.', w_be:'Dal 2026 le fatture tra aziende belghe devono essere e-fatture Peppol: questo PDF è una proforma.', w_fr:'Dal 1 settembre 2027 le fatture tra aziende francesi passano da una piattaforma approvata: questo PDF è una proforma.', w_de:'Dal 2028 le fatture tra aziende tedesche devono essere e-fatture (XRechnung/ZUGFeRD): questo PDF è una proforma.', w_es:'Dal luglio 2027 (forse rinviato al 2028) le fatture spagnole richiedono un software conforme a Verifactu.', note_export:'IVA non applicabile: prestazione fuori dall\'UE (art. 44 Direttiva 2006/112/CE).', note_rc_nonEU:'Reverse charge: l\'imposta è dovuta dal destinatario.', set_small_sub:'Nessuna IVA sulle fatture, con la dicitura di legge.', set_wh_sub:'Solo per clienti aziende nel tuo paese.', wh_waiver:'Esenzione (art. 101.º-B CIRS)', btw_icp:'Presenta anche l\'opgaaf ICP.',
     vies_btn:'Verifica', vies_busy:'Verifica in VIES…', vies_ok:'Valida in VIES', vies_bad:'Non valida in VIES: controlla il numero con il cliente.', vies_down:'VIES non risponde ora: riprova più tardi.', vies_setup:'La verifica VIES non è ancora attiva (funzione da pubblicare in Supabase).', vies_fmt:'Non sembra una partita IVA UE.',
+    ubl_gap_seller:'E-fattura scaricata. Per Peppol manca il tuo identificativo (KVK o partita IVA nelle impostazioni).', ubl_gap_buyer:'E-fattura scaricata. Per Peppol serve la partita IVA del cliente.', lbl_cref:'Riferimento del cliente / n. ordine (facoltativo)', set_phone:'Telefono',
     nav_dash:'Dashboard', nav_inv:'Nuovo Proforma', nav_an:'Analisi', nav_set:'Impostazioni',
     dash_h1:'Dashboard Operativa', dash_sub:'Monitora ore, incassi e stato dei proforma.',
     kpi_tot:'Totale Proforma', kpi_pend:'In Attesa', kpi_appr:'Da Incassare', kpi_tax:'Fondo Tasse',
@@ -1172,6 +1181,7 @@ const L = {
     nav_exp:'Expenses', exp_sub:'Receipts and the VAT you can reclaim.', exp_new:'New expense', exp_date:'Date', exp_vendor:'Supplier', exp_desc:'Description', exp_amount:'Amount paid', exp_vat:'VAT', exp_vstd:'{r}% VAT included', exp_v0:'No VAT / 0%', exp_vrcout:'Reverse charge: supplier outside the EU', exp_vrceu:'Reverse charge: supplier in another EU country', exp_rc_hint:'With reverse charge you pay no VAT to the supplier: you declare it and deduct it at once, so it nets to zero.', exp_receipt:'Receipt (photo or PDF)', exp_attach:'Attach receipt', exp_save:'SAVE EXPENSE', exp_vat_back:'VAT to reclaim', exp_spent:'spent', exp_empty:'No expenses yet.', exp_c_del:'Delete this expense?', exp_rc_tag:'Reverse charge', t_exp_saved:'Expense saved!', t_exp_del:'Expense deleted.', t_exp_warn:'Enter date, supplier and amount.', t_rcpt_big:'File too large (max 1.5 MB for PDFs, 10 MB for photos).', exp_db:'Run the database SQL update to enable expenses.', btw_paid:'VAT paid (reclaimable)', btw_pay:'To pay', btw_back:'To get back', btw_fill:'Numbers for your return',
     lbl_ctype:'Client type', opt_business:'Business', opt_private:'Private person', lbl_ccountry:'Client country', lbl_cvat:'Client VAT number', lbl_caddr:'Client address', lbl_svc:'Service date or period', ph_svc:'e.g. November 2026', other_country:'Other country (outside the EU)', pdf_svc:'SERVICE DATE', pdf_cvat:'VAT no.', tr_std:'{tax} {r}% on the total.', tr_rc:'Reverse charge: 0% VAT, your client accounts for VAT in their country.', tr_export:'Client outside the EU: no VAT.', tr_small:'Small business scheme: no VAT.', tr_none:'No VAT applied.', tr_wh:'{label} deducted from the total.', t_need_vat:'Reverse charge needs your client\'s VAT number.', w_it:'Italian invoices are only valid when sent through SDI: this PDF is a proforma.', w_pt:'In Portugal only invoices from certified software or the Portal das Finanças are valid: this PDF is a proforma.', w_pl:'Since 2026, Polish business-to-business invoices must be issued in KSeF: this PDF is a proforma.', w_be:'Since 2026, invoices between Belgian businesses must be Peppol e-invoices: this PDF is a proforma.', w_fr:'From 1 September 2027, invoices between French businesses go through an approved platform: this PDF is a proforma.', w_de:'From 2028, invoices between German businesses must be e-invoices (XRechnung/ZUGFeRD): this PDF is a proforma.', w_es:'From July 2027 (possibly postponed to 2028), Spanish invoices need Verifactu-compliant software.', note_export:'VAT not applicable: place of supply outside the EU (art. 44 Directive 2006/112/EC).', note_rc_nonEU:'Reverse charge: VAT to be accounted for by the recipient.', set_small_sub:'No VAT on invoices, with the legal wording.', set_wh_sub:'Only for business clients in your country.', wh_waiver:'Waiver (art. 101.º-B CIRS)', btw_icp:'Also file the EU sales listing (opgaaf ICP).',
     vies_btn:'Check', vies_busy:'Checking VIES…', vies_ok:'Valid in VIES', vies_bad:'Not valid in VIES: check the number with your client.', vies_down:'VIES isn\'t responding right now: try again later.', vies_setup:'The VIES check isn\'t set up yet (function to deploy in Supabase).', vies_fmt:'This doesn\'t look like an EU VAT number.',
+    ubl_gap_seller:'E-invoice downloaded. For Peppol, add your KVK or VAT number in Settings.', ubl_gap_buyer:'E-invoice downloaded. For Peppol, your client\'s VAT number is needed.', lbl_cref:'Client\'s reference / PO number (optional)', set_phone:'Phone',
     nav_dash:'Dashboard', nav_inv:'New Invoice', nav_an:'Analytics', nav_set:'Settings',
     dash_h1:'Operations Dashboard', dash_sub:'Track hours, revenue, and invoice status.',
     kpi_tot:'Total Invoices', kpi_pend:'Pending', kpi_appr:'Outstanding', kpi_tax:'Tax Vault',
@@ -1247,6 +1257,7 @@ const L = {
     nav_exp:'Kosten', exp_sub:'Bonnetjes en de btw die je terugkrijgt.', exp_new:'Nieuwe kosten', exp_date:'Datum', exp_vendor:'Leverancier', exp_desc:'Omschrijving', exp_amount:'Betaald bedrag', exp_vat:'Btw', exp_vstd:'Inclusief {r}% btw', exp_v0:'Geen btw / 0%', exp_vrcout:'Btw verlegd: leverancier buiten de EU', exp_vrceu:'Btw verlegd: leverancier in ander EU-land', exp_rc_hint:'Bij verlegde btw betaal je de leverancier geen btw: je geeft het aan en trekt het meteen weer af, netto € 0.', exp_receipt:'Bonnetje (foto of pdf)', exp_attach:'Bonnetje toevoegen', exp_save:'KOSTEN OPSLAAN', exp_vat_back:'Btw terug', exp_spent:'uitgegeven', exp_empty:'Nog geen kosten.', exp_c_del:'Deze kosten verwijderen?', exp_rc_tag:'Verlegd', t_exp_saved:'Kosten opgeslagen!', t_exp_del:'Kosten verwijderd.', t_exp_warn:'Vul datum, leverancier en bedrag in.', t_rcpt_big:'Bestand te groot (max 1,5 MB voor pdf, 10 MB voor foto’s).', exp_db:'Voer de SQL-update van de database uit om kosten te activeren.', btw_paid:'Voorbelasting', btw_pay:'Te betalen', btw_back:'Terug te krijgen', btw_fill:'Invullen bij je aangifte',
     lbl_ctype:'Soort klant', opt_business:'Bedrijf / zzp\'er', opt_private:'Particulier', lbl_ccountry:'Land van de klant', lbl_cvat:'Btw-nummer van de klant', lbl_caddr:'Adres van de klant', lbl_svc:'Leverdatum of periode', ph_svc:'bijv. november 2026', other_country:'Ander land (buiten de EU)', pdf_svc:'LEVERDATUM', pdf_cvat:'Btw-nr.', tr_std:'{tax} {r}% over het totaal.', tr_rc:'Btw verlegd: 0% btw, je klant draagt de btw af in eigen land.', tr_export:'Klant buiten de EU: geen btw.', tr_small:'Kleineondernemersregeling: geen btw.', tr_none:'Geen btw berekend.', tr_wh:'{label} ingehouden op het totaal.', t_need_vat:'Voor btw verlegd is het btw-nummer van je klant nodig.', w_it:'Italiaanse facturen zijn alleen geldig via SDI: deze pdf is een proforma.', w_pt:'In Portugal is alleen een factuur uit gecertificeerde software of het Portal das Finanças geldig: deze pdf is een proforma.', w_pl:'Sinds 2026 moeten Poolse facturen tussen bedrijven via KSeF: deze pdf is een proforma.', w_be:'Sinds 2026 moeten facturen tussen Belgische bedrijven Peppol-e-facturen zijn: deze pdf is een proforma.', w_fr:'Vanaf 1 september 2027 lopen facturen tussen Franse bedrijven via een erkend platform: deze pdf is een proforma.', w_de:'Vanaf 2028 moeten facturen tussen Duitse bedrijven e-facturen zijn (XRechnung/ZUGFeRD): deze pdf is een proforma.', w_es:'Vanaf juli 2027 (mogelijk uitgesteld tot 2028) vragen Spaanse facturen om Verifactu-software.', note_export:'Btw niet van toepassing: dienst buiten de EU (art. 44 Richtlijn 2006/112/EG).', note_rc_nonEU:'Verlegd: de btw wordt afgedragen door de afnemer.', set_small_sub:'Geen btw op facturen, met de verplichte vermelding.', set_wh_sub:'Alleen voor zakelijke klanten in je eigen land.', wh_waiver:'Vrijstelling (art. 101.º-B CIRS)', btw_icp:'Dien ook de opgaaf ICP in.',
     vies_btn:'Controleer', vies_busy:'VIES controleren…', vies_ok:'Geldig in VIES', vies_bad:'Niet geldig in VIES: controleer het nummer met je klant.', vies_down:'VIES reageert nu niet: probeer het later opnieuw.', vies_setup:'De VIES-controle is nog niet actief (functie publiceren in Supabase).', vies_fmt:'Dit lijkt geen EU-btw-nummer.',
+    ubl_gap_seller:'E-factuur gedownload. Voor Peppol: vul je KVK- of btw-nummer in bij Instellingen.', ubl_gap_buyer:'E-factuur gedownload. Voor Peppol is het btw-nummer van je klant nodig.', lbl_cref:'Referentie van de klant / ordernummer (optioneel)', set_phone:'Telefoon',
     nav_dash:'Dashboard', nav_inv:'Nieuwe Factuur', nav_an:'Analyse', nav_set:'Instellingen',
     dash_h1:'Operationeel Dashboard', dash_sub:'Volg uren, omzet en factuurstatus.',
     kpi_tot:'Totaal Facturen', kpi_pend:'In Behandeling', kpi_appr:'Openstaand', kpi_tax:'Belastingreserve',
@@ -1322,6 +1333,7 @@ const L = {
     nav_exp:'Ausgaben', exp_sub:'Belege und die Vorsteuer, die du zurückbekommst.', exp_new:'Neue Ausgabe', exp_date:'Datum', exp_vendor:'Lieferant', exp_desc:'Beschreibung', exp_amount:'Bezahlter Betrag', exp_vat:'USt.', exp_vstd:'Inkl. {r}% USt.', exp_v0:'Ohne USt. / 0%', exp_vrcout:'Reverse Charge: Lieferant außerhalb der EU', exp_vrceu:'Reverse Charge: Lieferant in anderem EU-Land', exp_rc_hint:'Beim Reverse Charge zahlst du dem Lieferanten keine USt.: du meldest sie und ziehst sie sofort wieder ab, netto null.', exp_receipt:'Beleg (Foto oder PDF)', exp_attach:'Beleg anhängen', exp_save:'AUSGABE SPEICHERN', exp_vat_back:'Vorsteuer', exp_spent:'ausgegeben', exp_empty:'Noch keine Ausgaben.', exp_c_del:'Diese Ausgabe löschen?', exp_rc_tag:'Reverse Charge', t_exp_saved:'Ausgabe gespeichert!', t_exp_del:'Ausgabe gelöscht.', t_exp_warn:'Datum, Lieferant und Betrag eingeben.', t_rcpt_big:'Datei zu groß (max. 1,5 MB für PDFs, 10 MB für Fotos).', exp_db:'Führe das SQL-Update der Datenbank aus, um Ausgaben zu aktivieren.', btw_paid:'Vorsteuer', btw_pay:'Zu zahlen', btw_back:'Erstattung', btw_fill:'Werte für die Erklärung',
     lbl_ctype:'Kundenart', opt_business:'Unternehmen', opt_private:'Privatperson', lbl_ccountry:'Land des Kunden', lbl_cvat:'USt-IdNr. des Kunden', lbl_caddr:'Adresse des Kunden', lbl_svc:'Leistungsdatum oder -zeitraum', ph_svc:'z.B. November 2026', other_country:'Anderes Land (außerhalb der EU)', pdf_svc:'LEISTUNGSDATUM', pdf_cvat:'USt-IdNr.', tr_std:'{tax} {r}% auf den Betrag.', tr_rc:'Reverse Charge: 0% USt., dein Kunde führt die Steuer in seinem Land ab.', tr_export:'Kunde außerhalb der EU: keine USt.', tr_small:'Kleinunternehmerregelung: keine USt.', tr_none:'Keine USt. berechnet.', tr_wh:'{label} wird vom Betrag einbehalten.', t_need_vat:'Für Reverse Charge wird die USt-IdNr. des Kunden benötigt.', w_it:'Italienische Rechnungen gelten nur über SDI: dieses PDF ist eine Proforma.', w_pt:'In Portugal gilt nur eine Rechnung aus zertifizierter Software oder dem Portal das Finanças: dieses PDF ist eine Proforma.', w_pl:'Seit 2026 müssen polnische B2B-Rechnungen über KSeF laufen: dieses PDF ist eine Proforma.', w_be:'Seit 2026 müssen Rechnungen zwischen belgischen Unternehmen Peppol-E-Rechnungen sein: dieses PDF ist eine Proforma.', w_fr:'Ab 1. September 2027 laufen Rechnungen zwischen französischen Unternehmen über eine zugelassene Plattform: dieses PDF ist eine Proforma.', w_de:'Ab 2028 müssen Rechnungen zwischen deutschen Unternehmen E-Rechnungen sein (XRechnung/ZUGFeRD): dieses PDF ist eine Proforma.', w_es:'Ab Juli 2027 (evtl. verschoben auf 2028) brauchen spanische Rechnungen Verifactu-konforme Software.', note_export:'Nicht steuerbar: Leistungsort außerhalb der EU (Art. 44 Richtlinie 2006/112/EG).', note_rc_nonEU:'Reverse Charge: Steuerschuldnerschaft des Leistungsempfängers.', set_small_sub:'Keine USt. auf Rechnungen, mit Pflichthinweis.', set_wh_sub:'Nur bei Geschäftskunden im eigenen Land.', wh_waiver:'Befreiung (art. 101.º-B CIRS)', btw_icp:'Auch die Zusammenfassende Meldung (opgaaf ICP) abgeben.',
     vies_btn:'Prüfen', vies_busy:'VIES wird geprüft…', vies_ok:'Gültig in VIES', vies_bad:'Nicht gültig in VIES: Nummer mit dem Kunden prüfen.', vies_down:'VIES antwortet gerade nicht: später erneut versuchen.', vies_setup:'Die VIES-Prüfung ist noch nicht aktiv (Funktion in Supabase veröffentlichen).', vies_fmt:'Das sieht nicht wie eine EU-USt-IdNr. aus.',
+    ubl_gap_seller:'E-Rechnung heruntergeladen. Für Peppol: KVK- oder USt-IdNr. in den Einstellungen eintragen.', ubl_gap_buyer:'E-Rechnung heruntergeladen. Für Peppol wird die USt-IdNr. des Kunden benötigt.', lbl_cref:'Referenz des Kunden / Bestellnummer (optional)', set_phone:'Telefon',
     nav_dash:'Dashboard', nav_inv:'Neue Rechnung', nav_an:'Analyse', nav_set:'Einstellungen',
     dash_h1:'Betriebsdashboard', dash_sub:'Stunden, Umsatz und Rechnungsstatus verfolgen.',
     kpi_tot:'Rechnungen Gesamt', kpi_pend:'Ausstehend', kpi_appr:'Offene Posten', kpi_tax:'Steuerrücklage',
@@ -1652,6 +1664,7 @@ async function viesCheck(auto) {
 function onClientTypeChange() {
   const business = document.getElementById('in-ctype').value === 'business';
   document.getElementById('in-cvat-wrap').classList.toggle('hidden', !business);
+  document.getElementById('in-cref-wrap').classList.toggle('hidden', !business);
   recalc();
 }
 
@@ -2186,6 +2199,7 @@ function dbToInv(r) {
     clientCountry:  (r.meta && r.meta.clientCountry) || '',
     clientVat:      (r.meta && r.meta.clientVat)     || '',
     clientAddress:  (r.meta && r.meta.clientAddress) || '',
+    clientRef:      (r.meta && r.meta.clientRef)     || '',
     serviceDate:    (r.meta && r.meta.serviceDate)   || '',
     kind:           (r.meta && r.meta.kind)          || '',
     legal:          (r.meta && Array.isArray(r.meta.legal)) ? r.meta.legal : null,
@@ -2217,7 +2231,7 @@ function invToDb(inv) {
     pay_link:         inv.payLink          || null,
     meta:             { lang: inv.docLang || S.lang, currency: S.settings.currency || 'EUR', country: S.settings.country || 'IT',
                         clientType: inv.clientType, clientCountry: inv.clientCountry, clientVat: inv.clientVat || '',
-                        clientAddress: inv.clientAddress || '', serviceDate: inv.serviceDate || '', kind: inv.kind,
+                        clientAddress: inv.clientAddress || '', clientRef: inv.clientRef || '', serviceDate: inv.serviceDate || '', kind: inv.kind,
                         legal: inv.legal || [], whLabel: inv.whLabel || '', proforma: !!inv.proforma, vies: inv.vies || null },
     created_at:       inv.createdAt,
   };
@@ -2466,6 +2480,7 @@ async function generateInvoice(e) {
     clientCountry:  document.getElementById('in-ccountry').value,
     clientVat,
     clientAddress:  document.getElementById('in-caddr').value.trim(),
+    clientRef:      document.getElementById('in-cref').value.trim(),
     serviceDate:    document.getElementById('in-svc').value.trim(),
     kind:           tr.kind,
     legal:          tr.legal,
@@ -3190,6 +3205,7 @@ function loadSetForm() {
   renderLogoPreview();
   document.getElementById('s-country').value  = S.settings.country     || 'IT';
   document.getElementById('s-name').value     = S.settings.name        || '';
+  document.getElementById('s-phone').value    = (S.settings.options || {}).phone || '';
   document.getElementById('s-email').value    = S.settings.email       || '';
   document.getElementById('s-vat').value      = S.settings.vat         || '';
   document.getElementById('s-vat2').value     = S.settings.vat2        || '';
@@ -3240,7 +3256,8 @@ async function saveSettings() {
     kleinunternehmer: S.settings.kleinunternehmer,
     autoentrepreneur: S.settings.autoentrepreneur,
     logo:             S.settings.logo || '',
-    options:          { ...(S.settings.options || {}), whOpt: document.getElementById('s-wh-opt').value || undefined },
+    options:          { ...(S.settings.options || {}), whOpt: document.getElementById('s-wh-opt').value || undefined,
+                        phone: document.getElementById('s-phone').value.trim() },
     terms:            document.getElementById('s-terms').value.trim(),
     dueDays:          parseInt(document.getElementById('s-days').value)   || 30,
   };
@@ -3528,96 +3545,184 @@ function buildInvoicePDF(inv) {
   return doc;
 }
 
-// ── UBL 2.1 EXPORT ────────────────────────────────────────────────────
-function exportUBL(id) {
-  const inv = S.invoices.find(i => i.id === id);
-  if (!inv) return;
+// ── UBL 2.1 / PEPPOL BIS BILLING 3.0 ─────────────────────────────────
+// Electronic address schemes from the official Peppol EAS code list (VAT-number based unless noted)
+const EAS_BY_VAT = { AT:'9914', BE:'9925', BG:'9926', CH:'9927', CY:'9928', CZ:'9929', DE:'9930', EE:'9931', GB:'9932', EL:'9933',
+  HR:'9934', IE:'9935', LI:'9936', LT:'9937', LU:'9938', LV:'9939', MC:'9940', MT:'9943', NL:'9944', PL:'9945', PT:'9946',
+  RO:'9947', SI:'9949', SK:'9950', HU:'9910', ES:'9920', FR:'9957', IT:'0211', DK:'0184', SE:'0007' };
+// Which settings field holds the seller's VAT number in each country
+const VAT_FIELD = { NL:'vat2', BE:'vat2', DE:'vat2', FR:'vat2', SE:'vat2' };
+
+function withPrefix(vat, country) {
+  const v = String(vat || '').toUpperCase().replace(/[\s.\-]/g, '');
+  if (!v) return '';
+  if (country === 'CH') return String(vat).trim();
+  const cc = country === 'GR' ? 'EL' : country;
+  return /^[A-Z]{2}/.test(v) ? v : cc + v;
+}
+
+function sellerVatId() {
+  const c = S.settings.country || 'IT';
+  return withPrefix(S.settings[VAT_FIELD[c] || 'vat'], c);
+}
+
+function endpointFromVat(vat) {
+  const v = String(vat || '').toUpperCase().replace(/[\s.\-]/g, '');
+  const cc = v.slice(0, 2) === 'GR' ? 'EL' : v.slice(0, 2);
+  const scheme = EAS_BY_VAT[cc];
+  if (!scheme || v.length < 4) return null;
+  if (cc === 'DK') return { scheme, id: v.slice(2) };
+  if (cc === 'SE') return { scheme, id: v.slice(2, 12) };
+  return { scheme, id: (cc === 'EL' ? 'EL' : '') + (cc === 'EL' ? v.slice(2) : v) };
+}
+
+function sellerEndpoint() {
+  const kvk = String(S.settings.vat || '').replace(/\s/g, '');
+  if ((S.settings.country || 'IT') === 'NL' && /^\d{8}$/.test(kvk)) return { scheme: '0106', id: kvk };
+  return endpointFromVat(sellerVatId());
+}
+
+const POSTCODE = {
+  NL: /\b(\d{4}\s?[A-Z]{2})\b/i, PT: /\b(\d{4}-\d{3})\b/, PL: /\b(\d{2}-\d{3})\b/,
+  SE: /\b(\d{3}\s?\d{2})\b/, CZ: /\b(\d{3}\s?\d{2})\b/, SK: /\b(\d{3}\s?\d{2})\b/, GR: /\b(\d{3}\s?\d{2})\b/,
+  GB: /\b([A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2})\b/i, IE: /\b([A-Z]\d{2}\s?[A-Z0-9]{4})\b/i, US: /\b(\d{5}(?:-\d{4})?)\b/,
+  BE: /\b(\d{4})\b/, AT: /\b(\d{4})\b/, CH: /\b(\d{4})\b/, DK: /\b(\d{4})\b/, LU: /\b(\d{4})\b/, HU: /\b(\d{4})\b/, NO: /\b(\d{4})\b/, AU: /\b(\d{4})\b/,
+};
+// Split a free-text address ("Iepenweg 17, 1091 JL Amsterdam") into street / postcode / city
+function parseAddress(text, country) {
+  const parts = String(text || '').split(/\n|,/).map(x => x.trim()).filter(Boolean);
+  const out = { street: '', postcode: '', city: '' };
+  if (!parts.length) return out;
+  const re = POSTCODE[country] || /\b(\d{5})\b/;
+  let idx = -1;
+  for (let i = parts.length - 1; i >= 0; i--) { if (re.test(parts[i]) && !(i === 0 && parts.length > 1)) { idx = i; break; } }
+  if (idx >= 0) {
+    const m = parts[idx].match(re);
+    out.postcode = m[1].toUpperCase().replace(/^(\d{4})([A-Z]{2})$/, '$1 $2');
+    out.city = parts[idx].replace(m[0], '').replace(/^[\s,\-]+|[\s,\-]+$/g, '') || (parts[idx + 1] || '');
+    out.street = parts.filter((_, i) => i !== idx && parts[i] !== out.city).join(', ');
+  } else {
+    out.street = parts[0];
+    out.city = parts.length > 1 ? parts[parts.length - 1] : '';
+  }
+  return out;
+}
+
+function ublAddress(text, country) {
+  const a = parseAddress(text, country);
+  return `<cac:PostalAddress>${a.street ? `<cbc:StreetName>${esc(a.street)}</cbc:StreetName>` : ''}${a.city ? `<cbc:CityName>${esc(a.city)}</cbc:CityName>` : ''}${a.postcode ? `<cbc:PostalZone>${esc(a.postcode)}</cbc:PostalZone>` : ''}<cac:Country><cbc:IdentificationCode>${esc(country)}</cbc:IdentificationCode></cac:Country></cac:PostalAddress>`;
+}
+
+function buildUBL(inv) {
   const cur = inv.currency || S.settings.currency || 'EUR';
-  const code = S.settings.country || 'IT';
-  const ctry = COUNTRIES[code] || COUNTRIES.IT;
-  // EN 16931 tax categories: S standard, AE reverse charge, G export outside the EU, E exempt, O not subject
+  const code = inv.sellerCountry || S.settings.country || 'IT';
+  const buyerCountry = inv.clientCountry && inv.clientCountry !== 'XX' ? inv.clientCountry : code;
+  // EN 16931 tax categories: S standard, Z zero, AE reverse charge, G export outside the EU, E exempt, O not subject
   const kind    = inv.kind || (S.settings.kleinunternehmer ? 'small' : (parseFloat(inv.vatRate||0) > 0 ? 'standard' : 'none'));
   const vatCode = { standard: parseFloat(inv.vatRate||0) > 0 ? 'S' : 'Z', rc_eu: 'AE', export: 'G', small: 'E', none: 'O' }[kind] || 'S';
   const vatPct  = vatCode === 'S' ? parseFloat(inv.vatRate||0) : 0;
   const reason  = { AE: 'Reverse charge', G: 'Export outside the EU', E: (inv.legal && inv.legal[0]) || 'Exempt', O: 'Not subject to VAT' }[vatCode];
-  const lineCat = `<cbc:ID>${vatCode}</cbc:ID>${vatCode === 'O' ? '' : `\n        <cbc:Percent>${vatPct}</cbc:Percent>`}`;
-  const taxCat  = `<cbc:ID>${vatCode}</cbc:ID>${vatCode === 'O' ? '' : `\n        <cbc:Percent>${vatPct}</cbc:Percent>`}${reason ? `\n        <cbc:TaxExemptionReason>${esc(reason)}</cbc:TaxExemptionReason>` : ''}`;
-  const subtotal = parseFloat(inv.subtotal || inv.total || 0).toFixed(2);
-  const vatAmt  = parseFloat(inv.vatAmount || 0).toFixed(2);
-  const total   = parseFloat(inv.total || 0).toFixed(2);
+  const pct     = vatCode === 'O' ? '' : `<cbc:Percent>${vatPct}</cbc:Percent>`;
+  const money   = n => (Math.round(parseFloat(n || 0) * 100) / 100).toFixed(2);
 
-  const lines = (inv.items || []).map((it, i) => {
-    const lineAmt = (parseFloat(it.hours||0) * parseFloat(it.rate||0)).toFixed(2);
-    return `  <cac:InvoiceLine>
-    <cbc:ID>${i+1}</cbc:ID>
-    <cbc:InvoicedQuantity unitCode="${it.discount ? 'C62' : 'HUR'}">${it.discount ? '-1.00' : parseFloat(it.hours||0).toFixed(2)}</cbc:InvoicedQuantity>
-    <cbc:LineExtensionAmount currencyID="${cur}">${lineAmt}</cbc:LineExtensionAmount>
+  const items = inv.items || [];
+  const lineAmounts = items.map(it => it.discount ? -Math.abs(parseFloat(it.amount || it.rate || 0)) : parseFloat(it.hours || 0) * parseFloat(it.rate || 0));
+  const lineSum = lineAmounts.reduce((a, b) => a + Math.round(b * 100) / 100, 0);
+  const vatAmt  = parseFloat(inv.vatAmount || 0);
+  const withheld = parseFloat(inv.ritenuteAmount || 0);
+  const inclusive = lineSum + vatAmt;
+
+  const sellerVat = vatCode === 'O' ? '' : sellerVatId();
+  const buyerVat  = vatCode === 'O' ? '' : withPrefix(inv.clientVat, buyerCountry);
+  const sEnd = sellerEndpoint(), bEnd = endpointFromVat(inv.clientVat);
+  const kvk = String(S.settings.vat || '').replace(/\s/g, '');
+  const sellerName = S.settings.name || S.settings.email || '';
+  const phone = (S.settings.options || {}).phone || '';
+  const notes = [...(inv.legal || []), inv.serviceDate ? `${t('pdf_svc')}: ${inv.serviceDate}` : ''].filter(Boolean).join('\n');
+  const iban = String(S.settings.iban || '').replace(/\s/g, '').toUpperCase();
+  const sepa = cur === 'EUR' && /^[A-Z]{2}\d{2}/.test(iban);
+
+  const lines = items.map((it, i) => `  <cac:InvoiceLine>
+    <cbc:ID>${i + 1}</cbc:ID>
+    <cbc:InvoicedQuantity unitCode="${it.discount ? 'C62' : 'HUR'}">${it.discount ? '-1' : parseFloat(it.hours || 0)}</cbc:InvoicedQuantity>
+    <cbc:LineExtensionAmount currencyID="${cur}">${money(lineAmounts[i])}</cbc:LineExtensionAmount>
     <cac:Item>
-      <cbc:Description>${esc(it.desc||'')}</cbc:Description>
-      <cbc:Name>${esc((it.desc||'').substring(0,40))}</cbc:Name>
-      <cac:ClassifiedTaxCategory>
-        ${lineCat}
-        <cac:TaxScheme><cbc:ID>VAT</cbc:ID></cac:TaxScheme>
-      </cac:ClassifiedTaxCategory>
+      <cbc:Description>${esc(it.desc || '')}</cbc:Description>
+      <cbc:Name>${esc((it.desc || '-').substring(0, 100))}</cbc:Name>
+      <cac:ClassifiedTaxCategory><cbc:ID>${vatCode}</cbc:ID>${pct}<cac:TaxScheme><cbc:ID>VAT</cbc:ID></cac:TaxScheme></cac:ClassifiedTaxCategory>
     </cac:Item>
-    <cac:Price>
-      <cbc:PriceAmount currencyID="${cur}">${Math.abs(parseFloat(it.rate||0)).toFixed(2)}</cbc:PriceAmount>
-    </cac:Price>
-  </cac:InvoiceLine>`;
-  }).join('\n');
+    <cac:Price><cbc:PriceAmount currencyID="${cur}">${money(Math.abs(parseFloat(it.discount ? (it.amount || it.rate) : it.rate || 0)))}</cbc:PriceAmount></cac:Price>
+  </cac:InvoiceLine>`).join('\n');
 
-  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+  return `<?xml version="1.0" encoding="UTF-8"?>
 <Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"
          xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2"
          xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">
-  <cbc:UBLVersionID>2.1</cbc:UBLVersionID>
   <cbc:CustomizationID>urn:cen.eu:en16931:2017#compliant#urn:fdc:peppol.eu:2017:poacc:billing:3.0</cbc:CustomizationID>
   <cbc:ProfileID>urn:fdc:peppol.eu:2017:poacc:billing:01:1.0</cbc:ProfileID>
   <cbc:ID>${esc(inv.id)}</cbc:ID>
-  <cbc:IssueDate>${inv.issueDate||new Date().toISOString().split('T')[0]}</cbc:IssueDate>${inv.dueDate ? `\n  <cbc:DueDate>${inv.dueDate}</cbc:DueDate>` : ''}
-  <cbc:InvoiceTypeCode>380</cbc:InvoiceTypeCode>
+  <cbc:IssueDate>${esc(inv.issueDate || new Date().toISOString().split('T')[0])}</cbc:IssueDate>${inv.dueDate ? `\n  <cbc:DueDate>${esc(inv.dueDate)}</cbc:DueDate>` : ''}
+  <cbc:InvoiceTypeCode>380</cbc:InvoiceTypeCode>${notes ? `\n  <cbc:Note>${esc(notes)}</cbc:Note>` : ''}
   <cbc:DocumentCurrencyCode>${cur}</cbc:DocumentCurrencyCode>
+  <cbc:BuyerReference>${esc(inv.clientRef || inv.id)}</cbc:BuyerReference>
   <cac:AccountingSupplierParty>
-    <cac:Party>
-      <cac:PartyName><cbc:Name>${esc(S.settings.name||S.settings.email||'')}</cbc:Name></cac:PartyName>${S.settings.address ? `\n      <cac:PostalAddress><cbc:StreetName>${esc(S.settings.address)}</cbc:StreetName><cac:Country><cbc:IdentificationCode>${code}</cbc:IdentificationCode></cac:Country></cac:PostalAddress>` : ''}${S.settings.vat ? `\n      <cac:PartyTaxScheme><cbc:CompanyID>${esc(S.settings.vat)}</cbc:CompanyID><cac:TaxScheme><cbc:ID>VAT</cbc:ID></cac:TaxScheme></cac:PartyTaxScheme>` : ''}
-      <cac:PartyLegalEntity><cbc:RegistrationName>${esc(S.settings.name||'')}</cbc:RegistrationName></cac:PartyLegalEntity>
-      <cac:Contact><cbc:ElectronicMail>${esc(S.settings.email||'')}</cbc:ElectronicMail></cac:Contact>
+    <cac:Party>${sEnd ? `\n      <cbc:EndpointID schemeID="${sEnd.scheme}">${esc(sEnd.id)}</cbc:EndpointID>` : ''}
+      <cac:PartyName><cbc:Name>${esc(sellerName)}</cbc:Name></cac:PartyName>
+      ${ublAddress(S.settings.address, code)}${sellerVat ? `\n      <cac:PartyTaxScheme><cbc:CompanyID>${esc(sellerVat)}</cbc:CompanyID><cac:TaxScheme><cbc:ID>VAT</cbc:ID></cac:TaxScheme></cac:PartyTaxScheme>` : ''}
+      <cac:PartyLegalEntity><cbc:RegistrationName>${esc(sellerName)}</cbc:RegistrationName>${code === 'NL' && /^\d{8}$/.test(kvk) ? `<cbc:CompanyID schemeID="0106">${kvk}</cbc:CompanyID>` : ''}</cac:PartyLegalEntity>
+      <cac:Contact><cbc:Name>${esc(sellerName)}</cbc:Name>${phone ? `<cbc:Telephone>${esc(phone)}</cbc:Telephone>` : ''}${S.settings.email ? `<cbc:ElectronicMail>${esc(S.settings.email)}</cbc:ElectronicMail>` : ''}</cac:Contact>
     </cac:Party>
   </cac:AccountingSupplierParty>
   <cac:AccountingCustomerParty>
-    <cac:Party>
-      <cac:PartyName><cbc:Name>${esc(inv.client||'')}</cbc:Name></cac:PartyName>
-      <cac:PostalAddress>${inv.clientAddress ? `<cbc:StreetName>${esc(inv.clientAddress.split('\n')[0])}</cbc:StreetName>` : ''}<cac:Country><cbc:IdentificationCode>${esc(inv.clientCountry && inv.clientCountry !== 'XX' ? inv.clientCountry : code)}</cbc:IdentificationCode></cac:Country></cac:PostalAddress>${inv.clientVat ? `\n      <cac:PartyTaxScheme><cbc:CompanyID>${esc(inv.clientVat)}</cbc:CompanyID><cac:TaxScheme><cbc:ID>VAT</cbc:ID></cac:TaxScheme></cac:PartyTaxScheme>` : ''}
-      <cac:PartyLegalEntity><cbc:RegistrationName>${esc(inv.client||'')}</cbc:RegistrationName></cac:PartyLegalEntity>${inv.clientEmail ? `\n      <cac:Contact><cbc:ElectronicMail>${esc(inv.clientEmail)}</cbc:ElectronicMail></cac:Contact>` : ''}
+    <cac:Party>${bEnd ? `\n      <cbc:EndpointID schemeID="${bEnd.scheme}">${esc(bEnd.id)}</cbc:EndpointID>` : ''}
+      <cac:PartyName><cbc:Name>${esc(inv.client || '')}</cbc:Name></cac:PartyName>
+      ${ublAddress(inv.clientAddress, buyerCountry)}${buyerVat ? `\n      <cac:PartyTaxScheme><cbc:CompanyID>${esc(buyerVat)}</cbc:CompanyID><cac:TaxScheme><cbc:ID>VAT</cbc:ID></cac:TaxScheme></cac:PartyTaxScheme>` : ''}
+      <cac:PartyLegalEntity><cbc:RegistrationName>${esc(inv.client || '')}</cbc:RegistrationName></cac:PartyLegalEntity>${inv.clientEmail ? `\n      <cac:Contact><cbc:ElectronicMail>${esc(inv.clientEmail)}</cbc:ElectronicMail></cac:Contact>` : ''}
     </cac:Party>
-  </cac:AccountingCustomerParty>${S.settings.iban ? `\n  <cac:PaymentMeans>\n    <cbc:PaymentMeansCode>30</cbc:PaymentMeansCode>\n    <cac:PayeeFinancialAccount><cbc:ID>${esc(S.settings.iban)}</cbc:ID></cac:PayeeFinancialAccount>\n  </cac:PaymentMeans>` : ''}${inv.notes ? `\n  <cac:PaymentTerms><cbc:Note>${esc(inv.notes)}</cbc:Note></cac:PaymentTerms>` : ''}
+  </cac:AccountingCustomerParty>${iban ? `
+  <cac:PaymentMeans>
+    <cbc:PaymentMeansCode>${sepa ? '58' : '30'}</cbc:PaymentMeansCode>
+    <cbc:PaymentID>${esc(inv.id)}</cbc:PaymentID>
+    <cac:PayeeFinancialAccount><cbc:ID>${esc(iban)}</cbc:ID><cbc:Name>${esc(sellerName)}</cbc:Name></cac:PayeeFinancialAccount>
+  </cac:PaymentMeans>` : ''}${inv.notes ? `\n  <cac:PaymentTerms><cbc:Note>${esc(inv.notes)}</cbc:Note></cac:PaymentTerms>` : ''}
   <cac:TaxTotal>
-    <cbc:TaxAmount currencyID="${cur}">${vatAmt}</cbc:TaxAmount>
+    <cbc:TaxAmount currencyID="${cur}">${money(vatAmt)}</cbc:TaxAmount>
     <cac:TaxSubtotal>
-      <cbc:TaxableAmount currencyID="${cur}">${subtotal}</cbc:TaxableAmount>
-      <cbc:TaxAmount currencyID="${cur}">${vatAmt}</cbc:TaxAmount>
-      <cac:TaxCategory>
-        ${taxCat}
-        <cac:TaxScheme><cbc:ID>VAT</cbc:ID></cac:TaxScheme>
-      </cac:TaxCategory>
+      <cbc:TaxableAmount currencyID="${cur}">${money(lineSum)}</cbc:TaxableAmount>
+      <cbc:TaxAmount currencyID="${cur}">${money(vatAmt)}</cbc:TaxAmount>
+      <cac:TaxCategory><cbc:ID>${vatCode}</cbc:ID>${pct}${reason ? `<cbc:TaxExemptionReason>${esc(reason)}</cbc:TaxExemptionReason>` : ''}<cac:TaxScheme><cbc:ID>VAT</cbc:ID></cac:TaxScheme></cac:TaxCategory>
     </cac:TaxSubtotal>
   </cac:TaxTotal>
   <cac:LegalMonetaryTotal>
-    <cbc:LineExtensionAmount currencyID="${cur}">${subtotal}</cbc:LineExtensionAmount>
-    <cbc:TaxExclusiveAmount currencyID="${cur}">${subtotal}</cbc:TaxExclusiveAmount>
-    <cbc:TaxInclusiveAmount currencyID="${cur}">${total}</cbc:TaxInclusiveAmount>
-    <cbc:PayableAmount currencyID="${cur}">${total}</cbc:PayableAmount>
+    <cbc:LineExtensionAmount currencyID="${cur}">${money(lineSum)}</cbc:LineExtensionAmount>
+    <cbc:TaxExclusiveAmount currencyID="${cur}">${money(lineSum)}</cbc:TaxExclusiveAmount>
+    <cbc:TaxInclusiveAmount currencyID="${cur}">${money(inclusive)}</cbc:TaxInclusiveAmount>${withheld ? `\n    <cbc:PrepaidAmount currencyID="${cur}">${money(withheld)}</cbc:PrepaidAmount>` : ''}
+    <cbc:PayableAmount currencyID="${cur}">${money(inclusive - withheld)}</cbc:PayableAmount>
   </cac:LegalMonetaryTotal>
 ${lines}
 </Invoice>`;
+}
 
+// What still stops this invoice from being sent over the Peppol network
+function peppolGaps(inv) {
+  const gaps = [];
+  if (!sellerEndpoint()) gaps.push(t('ubl_gap_seller'));
+  if (!endpointFromVat(inv.clientVat)) gaps.push(t('ubl_gap_buyer'));
+  return gaps;
+}
+
+function exportUBL(id) {
+  const inv = S.invoices.find(i => i.id === id);
+  if (!inv) return;
+  const xml = withInvoiceContext(inv, () => buildUBL(inv));
   const blob = new Blob([xml], { type: 'application/xml' });
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement('a');
   a.href = url; a.download = `${inv.id}.xml`;
   document.body.appendChild(a); a.click();
   document.body.removeChild(a); URL.revokeObjectURL(url);
-  toast('📑', t('t_ubl'));
+  const gaps = peppolGaps(inv);
+  toast(gaps.length ? '⚠️' : '📑', gaps.length ? gaps.join(' ') : t('t_ubl'));
 }
 
 // ── LOGO ──────────────────────────────────────────────────────────────
