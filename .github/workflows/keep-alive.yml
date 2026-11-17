@@ -1,28 +1,32 @@
 name: Keep Supabase Alive
 
+# Free Supabase projects pause after a week without activity. Read-only pings
+# were not enough (the project paused on 2026-11-09 despite daily 200s), so
+# this writes a heartbeat row and fails loudly, which makes GitHub email you.
 on:
   schedule:
     - cron: '0 8 * * *'  # Every day at 8:00 UTC
-  workflow_dispatch:      # Allow manual trigger
+  workflow_dispatch:
+
+env:
+  SUPABASE_URL: https://vkxtdaalzznmwcfuxuyp.supabase.co
+  SUPABASE_KEY: sb_publishable_66gbkXwBu2gMHR-JfQ9gDQ_NTekCZqi
 
 jobs:
   ping:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping Supabase REST
+      - name: Write heartbeat
         run: |
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-            "https://vkxtdaalzznmwcfuxuyp.supabase.co/rest/v1/invoices?select=id&limit=1" \
-            -H "apikey: sb_publishable_66gbkXwBu2gMHR-JfQ9gDQ_NTekCZqi" \
-            -H "Authorization: Bearer sb_publishable_66gbkXwBu2gMHR-JfQ9gDQ_NTekCZqi")
-          echo "REST status: $STATUS"
-
-      - name: Ping Supabase Auth
-        run: |
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-            "https://vkxtdaalzznmwcfuxuyp.supabase.co/auth/v1/health" \
-            -H "apikey: sb_publishable_66gbkXwBu2gMHR-JfQ9gDQ_NTekCZqi")
-          echo "Auth health status: $STATUS"
-          if [ "$STATUS" != "200" ]; then
-            echo "Warning: Auth health returned $STATUS"
-          fi
+          for attempt in 1 2 3; do
+            STATUS=$(curl -s -o body.txt -w "%{http_code}" -X POST \
+              "$SUPABASE_URL/rest/v1/rpc/keepalive" \
+              -H "apikey: $SUPABASE_KEY" \
+              -H "Authorization: Bearer $SUPABASE_KEY" \
+              -H "Content-Type: application/json" -d '{}') || STATUS=000
+            echo "Attempt $attempt: HTTP $STATUS $(cat body.txt 2>/dev/null)"
+            [ "$STATUS" = "200" ] && exit 0
+            sleep 20
+          done
+          echo "::error::Supabase heartbeat failed. If HTTP 000, the project is probably paused: restore it at supabase.com/dashboard. If HTTP 404, run the keepalive SQL from the DuFattur setup screen."
+          exit 1
