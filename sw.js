@@ -1,5 +1,5 @@
 // DuFattur service worker: caches the app itself, never user data.
-const VERSION = 'dufattur-v1';
+const VERSION = 'dufattur-v2';
 const SHELL = ['./', 'index.html', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'];
 // Third-party libraries the page loads (pinned versions, safe to keep)
 const CDN_HOSTS = ['cdn.jsdelivr.net', 'cdnjs.cloudflare.com', 'cdn.tailwindcss.com', 'fonts.googleapis.com', 'fonts.gstatic.com'];

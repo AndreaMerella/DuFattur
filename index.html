@@ -2,7 +2,7 @@
 <html lang="it" id="html-root">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>DuFattur | The Freelance OS</title>
     <link rel="manifest" href="manifest.webmanifest">
     <meta name="theme-color" content="#0a0a0a">
@@ -105,16 +105,19 @@
 
         /* ── MOBILE ─────────────────────────────────────────────────── */
         @media (max-width: 768px) {
-            /* Sidebar collapses to icon-only strip */
-            .sl { display: none !important; }
-            aside { width: 58px !important; padding: 16px 6px !important; }
-            aside .px-3 { padding: 0 !important; display: flex; justify-content: center; }
-            aside .px-3 .font-black { font-size: 0.75rem !important; }
-            aside .px-3 div:last-child { display: none; }
-            .nav-btn { padding: 10px 8px !important; justify-content: center !important; }
+            /* Sidebar becomes a bottom tab bar; language stays in Settings */
+            aside#sidebar { position: fixed; left: 0; right: 0; bottom: 0; top: auto; width: auto !important; height: auto;
+                padding: 6px 6px calc(6px + env(safe-area-inset-bottom)) !important; border-right: none; border-top: 1px solid #1c1c1c; z-index: 45; }
+            aside#sidebar > :not(nav) { display: none !important; }
+            aside#sidebar nav { flex-direction: row !important; gap: 2px !important; }
+            .nav-btn { flex: 1 1 0; min-width: 0; flex-direction: column; gap: 3px !important; padding: 7px 2px !important; justify-content: center !important; border-radius: 10px; }
+            .nav-btn .ico { font-size: 1.15rem; }
+            .nav-btn .sl { font-size: 10px; font-weight: 700; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-            /* Main content full width */
-            #main-content { padding: 0 !important; }
+            /* Main content full width, clear of the tab bar */
+            #main-content { padding: 0 0 calc(76px + env(safe-area-inset-bottom)) !important; }
+            #mobile-brand { display: block !important; }
+            #sidebar.hidden-view ~ main #mobile-brand { display: none !important; }
 
             /* Dashboard */
             #view-dashboard { padding: 16px 14px !important; }
@@ -168,8 +171,6 @@
             /* Login view */
             #view-login { padding: 20px 16px !important; }
 
-            /* Lang toggle */
-            aside .mt-4 { margin-top: 8px !important; }
         }
     </style>
 </head>
@@ -217,10 +218,10 @@
     <!-- Lang toggle -->
     <div class="px-1 mt-4">
         <div class="grid grid-cols-2 gap-1 bg-black rounded-xl p-1 border border-gray-900">
-            <button onclick="setLang('it')" id="lang-it" class="py-1.5 rounded-lg text-[10px] font-black transition bg-accent text-black">🇮🇹 IT</button>
-            <button onclick="setLang('en')" id="lang-en" class="py-1.5 rounded-lg text-[10px] font-black transition text-gray-600 hover:text-white">🇬🇧 EN</button>
-            <button onclick="setLang('nl')" id="lang-nl" class="py-1.5 rounded-lg text-[10px] font-black transition text-gray-600 hover:text-white">🇳🇱 NL</button>
-            <button onclick="setLang('de')" id="lang-de" class="py-1.5 rounded-lg text-[10px] font-black transition text-gray-600 hover:text-white">🇩🇪 DE</button>
+            <button onclick="setLang('it')" data-lang="it" class="py-1.5 rounded-lg text-[10px] font-black transition bg-accent text-black">🇮🇹 IT</button>
+            <button onclick="setLang('en')" data-lang="en" class="py-1.5 rounded-lg text-[10px] font-black transition text-gray-600 hover:text-white">🇬🇧 EN</button>
+            <button onclick="setLang('nl')" data-lang="nl" class="py-1.5 rounded-lg text-[10px] font-black transition text-gray-600 hover:text-white">🇳🇱 NL</button>
+            <button onclick="setLang('de')" data-lang="de" class="py-1.5 rounded-lg text-[10px] font-black transition text-gray-600 hover:text-white">🇩🇪 DE</button>
         </div>
     </div>
     <div class="px-3 mt-3 text-[10px] text-gray-700 font-bold">v3.0 · DuFattur</div>
@@ -228,6 +229,7 @@
 
 <!-- ═══════════════════ MAIN ═══════════════════ -->
 <main class="flex-1 overflow-y-auto" id="main-content">
+    <div id="mobile-brand" style="display:none" class="px-[14px] pt-4 font-black text-base tracking-tighter">DU<span class="text-accent">FATTUR</span></div>
     <div id="guest-bar" class="hidden sticky top-0 z-40 flex items-center justify-center gap-3 flex-wrap px-4 py-2.5 text-xs font-bold" style="background:rgba(var(--accent-rgb),.14);border-bottom:1px solid rgba(var(--accent-rgb),.35);">
         <span class="text-gray-200" data-i18n="guest_bar">Trial mode: everything stays on this device.</span>
         <button type="button" onclick="leaveGuestToSignup()" class="text-accent underline" data-i18n="guest_cta">Create a free account →</button>
@@ -1106,10 +1108,10 @@ grant execute on function public.keepalive() to anon;</pre>
             <div class="card" style="background:#0e0e0e;border-color:#1e1e1e;">
                 <h3 class="text-[10px] font-black uppercase tracking-widest text-gray-500 mb-4" data-i18n="set_lang">Lingua / Language</h3>
                 <div class="grid grid-cols-2 gap-1 bg-black rounded-xl p-1 border border-gray-900 max-w-[180px]">
-                    <button onclick="setLang('it')" id="lang-it" class="py-1.5 rounded-lg text-[10px] font-black transition bg-accent text-black">🇮🇹 IT</button>
-                    <button onclick="setLang('en')" id="lang-en" class="py-1.5 rounded-lg text-[10px] font-black transition text-gray-600 hover:text-white">🇬🇧 EN</button>
-                    <button onclick="setLang('nl')" id="lang-nl" class="py-1.5 rounded-lg text-[10px] font-black transition text-gray-600 hover:text-white">🇳🇱 NL</button>
-                    <button onclick="setLang('de')" id="lang-de" class="py-1.5 rounded-lg text-[10px] font-black transition text-gray-600 hover:text-white">🇩🇪 DE</button>
+                    <button onclick="setLang('it')" data-lang="it" class="py-1.5 rounded-lg text-[10px] font-black transition bg-accent text-black">🇮🇹 IT</button>
+                    <button onclick="setLang('en')" data-lang="en" class="py-1.5 rounded-lg text-[10px] font-black transition text-gray-600 hover:text-white">🇬🇧 EN</button>
+                    <button onclick="setLang('nl')" data-lang="nl" class="py-1.5 rounded-lg text-[10px] font-black transition text-gray-600 hover:text-white">🇳🇱 NL</button>
+                    <button onclick="setLang('de')" data-lang="de" class="py-1.5 rounded-lg text-[10px] font-black transition text-gray-600 hover:text-white">🇩🇪 DE</button>
                 </div>
             </div>
 
@@ -1841,9 +1843,8 @@ function applyTr() {
   });
   const cls_a = 'flex-1 py-2 rounded-lg text-xs font-black transition bg-accent text-black';
   const cls_i = 'flex-1 py-2 rounded-lg text-xs font-black transition text-gray-600 hover:text-white';
-  ['lang-it','lang-en','lang-nl','lang-de'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.className = (id === 'lang-'+S.lang) ? cls_a.replace('flex-1','') : cls_i.replace('flex-1','');
+  document.querySelectorAll('[data-lang]').forEach(el => {
+    el.className = (el.dataset.lang === S.lang) ? cls_a.replace('flex-1','') : cls_i.replace('flex-1','');
   });
   // Re-apply country-specific labels after language change
   onCountryChange();
