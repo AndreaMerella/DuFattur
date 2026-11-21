@@ -31,7 +31,9 @@
     <style id="theme-style"></style>
     <style>
         * { -webkit-font-smoothing: antialiased; }
-        body { background-color: #0a0a0a; color: white; }
+        body { background-color: #0a0a0a; color: white; padding-top: env(safe-area-inset-top); }
+        /* Solid so content never shows through while scrolling */
+        #guest-bar { background: linear-gradient(rgba(var(--accent-rgb),.16), rgba(var(--accent-rgb),.16)), #0a0a0a !important; }
         .hidden-view { display: none !important; }
         /* Ensure Tailwind's .hidden always wins over .flex/.flex-col etc. */
         .hidden { display: none !important; }
@@ -117,6 +119,7 @@
             /* Main content full width, clear of the tab bar */
             #main-content { padding: 0 0 calc(76px + env(safe-area-inset-bottom)) !important; }
             #mobile-brand { display: block !important; }
+            #guest-bar { gap: 4px 10px !important; padding: 7px 12px !important; font-size: 11px !important; line-height: 1.35; }
             #sidebar.hidden-view ~ main #mobile-brand { display: none !important; }
 
             /* Dashboard */
@@ -1753,7 +1756,7 @@ function fillClientCountries(selected) {
 }
 
 // ── HELPERS ───────────────────────────────────────────────────────────
-function t(k) { return L[S.lang][k] || L.it[k] || k; }
+function t(k) { const v = L[S.lang][k] || L.it[k] || k; return typeof v === 'string' && v.includes('€/h') ? v.replace('€/h', sym() + '/h') : v; }
 function sym() { return { EUR:'€', USD:'$', GBP:'£', CHF:'Fr.', AUD:'A$', CAD:'C$', DKK:'kr', SEK:'kr', NOK:'kr', PLN:'zł' }[S.settings.currency] || '€'; }
 const LOCALES = { it:'it-IT', en:'en-GB', nl:'nl-NL', de:'de-DE' };
 // jsPDF's built-in fonts lack U+202F/U+2212, which some locales emit
@@ -2972,6 +2975,7 @@ function renderDash() {
   document.getElementById('kpi-overdue').textContent  = overdue;
   document.getElementById('timer-rate-in').value      = S.settings.defaultRate;
   document.getElementById('timer-rate-show').textContent = `@ ${sym()}${S.settings.defaultRate}/h`;
+  if (!S.timer.on) document.getElementById('live-earn').textContent = fmt(S.timer.earn || 0);
 
   const filter = document.getElementById('filter-sel').value;
   const list   = document.getElementById('invoice-list');
