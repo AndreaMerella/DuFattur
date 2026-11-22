@@ -1142,7 +1142,7 @@ grant execute on function public.keepalive() to anon;</pre>
 
             <div class="card border-red-900" style="background:#0e0e0e;">
                 <h3 class="text-[10px] font-black uppercase tracking-widest text-red-500 mb-2" data-i18n="set_danger">Zona Pericolosa</h3>
-                <p class="text-gray-600 text-xs mb-4" data-i18n="set_danger_p">Elimina tutti i proforma dal database. Azione irreversibile.</p>
+                <p class="text-gray-600 text-xs mb-4" data-i18n="set_danger_p">Elimina tutte le TUE fatture (gli altri utenti non sono toccati). Irreversibile: esporta prima i tuoi dati, la legge fiscale richiede di conservare le fatture per anni.</p>
                 <button onclick="clearData()" class="bg-red-700 hover:bg-red-600 text-white px-5 py-3 rounded-xl font-black text-sm transition" data-i18n="btn_clear">Cancella Tutti i Dati</button>
             </div>
 
@@ -1208,7 +1208,7 @@ const L = {
     ph_terms:'Es. Pagamento dovuto entro 30 giorni dalla data di emissione.',
     set_days:'Giorni scadenza default',
     set_lang:'Lingua', set_theme:'Colore Tema',
-    set_danger:'Zona Pericolosa', set_danger_p:'Elimina tutti i proforma dal database. Azione irreversibile.',
+    set_danger:'Zona Pericolosa', set_danger_p:'Elimina tutte le TUE fatture (gli altri utenti non sono toccati). Irreversibile: esporta prima i tuoi dati, la legge fiscale richiede di conservare le fatture per anni.',
     btn_clear:'Cancella Tutti i Dati', btn_save:'SALVA IMPOSTAZIONI', btn_logout:'Logout',
     ph_item:'Descrizione servizio',
     s_pending:'In attesa', s_approved:'Approvato', s_paid:'Pagato', s_overdue:'Scaduto',
@@ -1228,7 +1228,7 @@ const L = {
     em_title:'Invia Proforma', em_to:'A', em_subj_lbl:'Oggetto', em_body_lbl:'Messaggio',
     em_open:'Apri nel client email', em_copy:'Copia testo',
     empty:'Nessun proforma trovato. Crea il primo!',
-    c_del:'Eliminare questo proforma?', c_clear:'Sei SICURO? Verranno eliminati TUTTI i proforma.',
+    c_del:'Eliminare questo proforma?', c_clear:'Verranno eliminate TUTTE le tue fatture. Per confermare scrivi ELIMINA:', c_clear_word:'ELIMINA',
     due_lbl:'Scade il', issue_lbl:'Emesso il',
     no_clients:'Nessun dato disponibile.',
     pdf_type:'PROFORMA', pdf_from:'DA', pdf_to:'A',
@@ -1286,7 +1286,7 @@ const L = {
     ph_terms:'e.g. Payment is due within 30 days of the invoice date.',
     set_days:'Default due days',
     set_lang:'Language', set_theme:'Accent Color',
-    set_danger:'Danger Zone', set_danger_p:'Deletes all invoices from the database. This cannot be undone.',
+    set_danger:'Danger Zone', set_danger_p:'Deletes all YOUR invoices (no one else is affected). This cannot be undone: export your data first, tax law requires you to keep invoices for years.',
     btn_clear:'Clear All Data', btn_save:'SAVE SETTINGS', btn_logout:'Logout',
     ph_item:'Service description',
     s_pending:'Pending', s_approved:'Approved', s_paid:'Paid', s_overdue:'Overdue',
@@ -1306,7 +1306,7 @@ const L = {
     em_title:'Send Invoice', em_to:'To', em_subj_lbl:'Subject', em_body_lbl:'Message',
     em_open:'Open in Email Client', em_copy:'Copy Body',
     empty:'No invoices found. Create your first one!',
-    c_del:'Delete this invoice?', c_clear:'Are you SURE? This will delete ALL invoices.',
+    c_del:'Delete this invoice?', c_clear:'This deletes ALL your invoices. Type DELETE to confirm:', c_clear_word:'DELETE',
     due_lbl:'Due', issue_lbl:'Issued',
     no_clients:'No data available.',
     pdf_type:'INVOICE', pdf_from:'FROM', pdf_to:'TO',
@@ -1364,7 +1364,7 @@ const L = {
     ph_terms:'bijv. Betaling verschuldigd binnen 30 dagen na factuurdatum.',
     set_days:'Standaard vervaldagen',
     set_lang:'Taal', set_theme:'Accentkleur',
-    set_danger:'Gevarenzone', set_danger_p:'Verwijdert alle facturen uit de database. Dit kan niet ongedaan worden gemaakt.',
+    set_danger:'Gevarenzone', set_danger_p:'Verwijdert al JOUW facturen (andere gebruikers merken er niets van). Dit kan niet ongedaan worden gemaakt: exporteer eerst je gegevens, de wet verplicht je facturen 7 jaar te bewaren.',
     btn_clear:'Alle Gegevens Wissen', btn_save:'INSTELLINGEN OPSLAAN', btn_logout:'Uitloggen',
     ph_item:'Serviceomschrijving',
     s_pending:'In behandeling', s_approved:'Goedgekeurd', s_paid:'Betaald', s_overdue:'Verlopen',
@@ -1384,7 +1384,7 @@ const L = {
     em_title:'Factuur Versturen', em_to:'Aan', em_subj_lbl:'Onderwerp', em_body_lbl:'Bericht',
     em_open:'Openen in e-mailprogramma', em_copy:'Tekst Kopiëren',
     empty:'Geen facturen gevonden. Maak uw eerste!',
-    c_del:'Deze factuur verwijderen?', c_clear:'Weet u het ZEKER? Dit verwijdert ALLE facturen.',
+    c_del:'Deze factuur verwijderen?', c_clear:'Dit verwijdert AL je facturen. Typ VERWIJDER om te bevestigen:', c_clear_word:'VERWIJDER',
     due_lbl:'Vervaldatum', issue_lbl:'Uitgifte',
     no_clients:'Geen gegevens beschikbaar.',
     pdf_type:'FACTUUR', pdf_from:'VAN', pdf_to:'AAN',
@@ -1442,7 +1442,7 @@ const L = {
     ph_terms:'z.B. Zahlung fällig innerhalb von 30 Tagen nach Rechnungsdatum.',
     set_days:'Standard Fälligkeitstage',
     set_lang:'Sprache', set_theme:'Akzentfarbe',
-    set_danger:'Gefahrenzone', set_danger_p:'Löscht alle Rechnungen aus der Datenbank. Dies kann nicht rückgängig gemacht werden.',
+    set_danger:'Gefahrenzone', set_danger_p:'Löscht alle DEINE Rechnungen (andere Nutzer sind nicht betroffen). Nicht rückgängig zu machen: exportiere zuerst deine Daten, Rechnungen müssen steuerlich jahrelang aufbewahrt werden.',
     btn_clear:'Alle Daten Löschen', btn_save:'EINSTELLUNGEN SPEICHERN', btn_logout:'Abmelden',
     ph_item:'Leistungsbeschreibung',
     s_pending:'Ausstehend', s_approved:'Genehmigt', s_paid:'Bezahlt', s_overdue:'Überfällig',
@@ -1462,7 +1462,7 @@ const L = {
     em_title:'Rechnung Senden', em_to:'An', em_subj_lbl:'Betreff', em_body_lbl:'Nachricht',
     em_open:'Im E-Mail-Programm öffnen', em_copy:'Text Kopieren',
     empty:'Keine Rechnungen gefunden. Erste erstellen!',
-    c_del:'Diese Rechnung löschen?', c_clear:'Sind Sie SICHER? Alle Rechnungen werden gelöscht.',
+    c_del:'Diese Rechnung löschen?', c_clear:'Damit werden ALLE deine Rechnungen gelöscht. Zum Bestätigen LÖSCHEN eingeben:', c_clear_word:'LÖSCHEN',
     due_lbl:'Fällig', issue_lbl:'Ausgestellt',
     no_clients:'Keine Daten verfügbar.',
     pdf_type:'RECHNUNG', pdf_from:'VON', pdf_to:'AN',
@@ -3499,7 +3499,8 @@ async function saveSettings() {
 }
 
 async function clearData() {
-  if (!confirm(t('c_clear'))) return;
+  const typed = prompt(t('c_clear'));
+  if ((typed || '').trim().toUpperCase() !== t('c_clear_word')) return;
   try {
     if (!S.guest) {
       const { error } = await _sb.from('invoices').delete().eq('user_id', USER.id);
